@@ -1,0 +1,8 @@
+[project]
+name = "sailing-track-visualizer"
+version = "0.1.0"
+description = "A Flask app to visualize sailing GPS tracks from JSON files"
+requires-python = ">=3.9"
+dependencies = [
+    "flask>=3.0.0",
+]
