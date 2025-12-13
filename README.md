@@ -6,21 +6,26 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 
 - Displays multiple sailing tracks on an interactive OpenStreetMap
 - Color-coded track segments based on engine RPM and wind speed:
-  - **Black**: Engine off (RPM = 0) - sailing under wind power
-  - **Color gradient**: Engine running (RPM > 0) - colored by true wind speed (TWS)
-    - Uses a cold ice to hot metal colormap
-    - Blue/cyan = low wind speed
-    - Green/yellow = moderate wind speed
-    - Orange/red/white = high wind speed
-- Animates a boat icon moving along all tracks in sequence
+  - **Black**: Engine running (RPM > 0) - motoring
+  - **Color gradient**: Sailing under wind power (RPM = 0) - colored by true wind speed (TWS)
+    - Uses CMRmap colormap (Color Map for Remote sensing)
+    - Black/Dark red = low wind speed
+    - Red/Magenta = moderate wind speed
+    - Blue/White = high wind speed
+- Interactive TWS color legend in bottom-left corner:
+  - Shows CMRmap gradient from minimum to maximum wind speed when sailing
+  - Includes min, middle, and max TWS values
+  - Notes that black lines indicate engine running (RPM > 0)
+- Animates a boat icon moving along all tracks in chronological order
+  - Original track remains fully visible (no overlaying animation trail)
 - Shows start (green) and end (red) markers for each track
 - Adjustable animation speed (1x to 10x)
 - Play, pause, and reset controls
 - Displays real-time information during animation:
   - Date/Time (UTC)
+  - Latitude and Longitude coordinates
   - Engine RPM
   - True Wind Speed (TWS)
-  - Progress percentage
 - Automatically fits the map to show all tracks
 
 ## Prerequisites

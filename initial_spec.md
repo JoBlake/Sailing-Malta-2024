@@ -25,6 +25,8 @@ Sophisticated code user
 * Create a readme with usage instructions
 
 ## Update
-* Plot the line black when rpm field is 0
-* When rpm is not zero, plot the line color as a function of the value tws in the jason file. Use the cold ice / hot metal color map 
-* display the values for date/time, rpm, and tws in the lower right during the animation
+* Plot the line black when rpm field is not zero
+* When rpm is zero, plot the line color as a function of the value tws in the jason file. Use the CMRmap color map. Normalize the tws value to use the full range of the color map
+* insert a legend showing the color of a tws value 
+* display the values for date/time, lat, lon, rpm, and tws in the lower right during the animation
+* Do not overwrite the track during the animation

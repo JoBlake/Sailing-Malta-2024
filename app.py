@@ -31,7 +31,7 @@ def load_track_data():
                     'cog': point.get('cog', 0)
                 })
                 all_coords.append([lat, lon])
-                if rpm > 0:  # Only collect tws values when engine is running
+                if rpm == 0:  # Only collect tws values when sailing (engine off)
                     all_tws_values.append(tws)
             all_tracks.append({
                 'name': filename,
