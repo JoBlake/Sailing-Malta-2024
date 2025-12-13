@@ -5,11 +5,22 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 ## Features
 
 - Displays multiple sailing tracks on an interactive OpenStreetMap
+- Color-coded track segments based on engine RPM and wind speed:
+  - **Black**: Engine off (RPM = 0) - sailing under wind power
+  - **Color gradient**: Engine running (RPM > 0) - colored by true wind speed (TWS)
+    - Uses a cold ice to hot metal colormap
+    - Blue/cyan = low wind speed
+    - Green/yellow = moderate wind speed
+    - Orange/red/white = high wind speed
 - Animates a boat icon moving along all tracks in sequence
 - Shows start (green) and end (red) markers for each track
 - Adjustable animation speed (1x to 10x)
 - Play, pause, and reset controls
-- Displays real-time information: track name, timestamp, and progress
+- Displays real-time information during animation:
+  - Date/Time (UTC)
+  - Engine RPM
+  - True Wind Speed (TWS)
+  - Progress percentage
 - Automatically fits the map to show all tracks
 
 ## Prerequisites
@@ -61,7 +72,7 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 
 3. Open your web browser and navigate to:
    ```
-   http://localhost:5000
+   http://localhost:5001
    ```
 
 4. Use the controls at the bottom of the page:
@@ -79,6 +90,8 @@ The application expects JSON files with the following structure:
   {
     "lat": "38.9246304",
     "lon": "20.9019872",
+    "rpm": "1327",
+    "tws": "5.2",
     "utc": "2024-08-21 11:26:00",
     "sog": "0.00",
     "cog": "35.8"
@@ -89,6 +102,8 @@ The application expects JSON files with the following structure:
 Required fields:
 - `lat`: Latitude coordinate
 - `lon`: Longitude coordinate
+- `rpm`: Engine RPM (0 = engine off, >0 = engine running)
+- `tws`: True wind speed (used for color coding when engine is running)
 
 Optional fields (displayed in info panel):
 - `utc`: Timestamp

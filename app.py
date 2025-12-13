@@ -10,6 +10,7 @@ def load_track_data():
     track_files = sorted(glob.glob("export *.json"))
     all_tracks = []
     all_coords = []
+    all_tws_values = []
 
     for filename in track_files:
         with open(filename, 'r') as f:
@@ -18,14 +19,20 @@ def load_track_data():
             for point in data:
                 lat = float(point['lat'])
                 lon = float(point['lon'])
+                rpm = int(point.get('rpm', 0))
+                tws = float(point.get('tws', 0))
                 track.append({
                     'lat': lat,
                     'lon': lon,
+                    'rpm': rpm,
+                    'tws': tws,
                     'utc': point.get('utc', ''),
                     'sog': point.get('sog', 0),
                     'cog': point.get('cog', 0)
                 })
                 all_coords.append([lat, lon])
+                if rpm > 0:  # Only collect tws values when engine is running
+                    all_tws_values.append(tws)
             all_tracks.append({
                 'name': filename,
                 'points': track
@@ -46,7 +53,15 @@ def load_track_data():
     else:
         bounds = None
 
-    return all_tracks, bounds
+    # Calculate tws range for color mapping
+    tws_range = None
+    if all_tws_values:
+        tws_range = {
+            'min': min(all_tws_values),
+            'max': max(all_tws_values)
+        }
+
+    return all_tracks, bounds, tws_range
 
 @app.route('/')
 def index():
@@ -56,10 +71,11 @@ def index():
 @app.route('/api/tracks')
 def get_tracks():
     """API endpoint that returns all track data"""
-    tracks, bounds = load_track_data()
+    tracks, bounds, tws_range = load_track_data()
     return jsonify({
         'tracks': tracks,
-        'bounds': bounds
+        'bounds': bounds,
+        'tws_range': tws_range
     })
 
 if __name__ == '__main__':

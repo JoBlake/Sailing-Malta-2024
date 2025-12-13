@@ -116,6 +116,7 @@
         let map;
         let tracks = [];
         let bounds = null;
+        let twsRange = null;
         let allPoints = [];
         let currentIndex = 0;
         let animationInterval = null;
@@ -132,6 +133,7 @@
                 const data = await response.json();
                 tracks = data.tracks;
                 bounds = data.bounds;
+                twsRange = data.tws_range;
 
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
@@ -151,19 +153,39 @@
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
 
-                // Draw all tracks on the map
+                // Draw all tracks on the map with color based on RPM and TWS
                 tracks.forEach((track, index) => {
-                    const coords = track.points.map(p => [p.lat, p.lon]);
-                    const polyline = L.polyline(coords, {
-                        color: getTrackColor(index),
-                        weight: 2,
-                        opacity: 0.6
-                    }).addTo(map);
-                    trackPolylines.push(polyline);
+                    // Draw segments based on RPM and TWS
+                    for (let i = 0; i < track.points.length - 1; i++) {
+                        const p1 = track.points[i];
+                        const p2 = track.points[i + 1];
+
+                        let color;
+                        // If either point has RPM = 0, draw black
+                        if (p1.rpm === 0 || p2.rpm === 0) {
+                            color = 'black';
+                        } else {
+                            // Use tws-based color when engine is running
+                            // Average the tws values of the two points
+                            const avgTws = (p1.tws + p2.tws) / 2;
+                            color = getTwsColor(avgTws);
+                        }
+
+                        const segment = L.polyline(
+                            [[p1.lat, p1.lon], [p2.lat, p2.lon]],
+                            {
+                                color: color,
+                                weight: 3,
+                                opacity: 0.7
+                            }
+                        ).addTo(map);
+                        trackPolylines.push(segment);
+                    }
 
                     // Add start marker
-                    if (coords.length > 0) {
-                        L.circleMarker(coords[0], {
+                    if (track.points.length > 0) {
+                        const start = track.points[0];
+                        L.circleMarker([start.lat, start.lon], {
                             radius: 5,
                             color: 'green',
                             fillColor: 'green',
@@ -172,8 +194,9 @@
                     }
 
                     // Add end marker
-                    if (coords.length > 0) {
-                        L.circleMarker(coords[coords.length - 1], {
+                    if (track.points.length > 0) {
+                        const end = track.points[track.points.length - 1];
+                        L.circleMarker([end.lat, end.lon], {
                             radius: 5,
                             color: 'red',
                             fillColor: 'red',
@@ -226,14 +249,61 @@
             }
         }
 
-        // Get color for each track
-        function getTrackColor(index) {
-            const colors = [
-                '#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-                '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4',
-                '#469990', '#dcbeff', '#9A6324', '#fffac8', '#800000', '#aaffc3'
-            ];
-            return colors[index % colors.length];
+        // Cold ice / hot metal colormap
+        // Maps a value from 0-1 to a color in the cold ice to hot metal range
+        function getColorFromValue(value) {
+            // Clamp value between 0 and 1
+            value = Math.max(0, Math.min(1, value));
+
+            // Cold ice (blue/cyan) to hot metal (red/yellow/white)
+            // Blue -> Cyan -> Green -> Yellow -> Orange -> Red -> White
+            if (value < 0.2) {
+                // Blue to Cyan
+                const t = value / 0.2;
+                const r = 0;
+                const g = Math.floor(t * 255);
+                const b = 255;
+                return `rgb(${r}, ${g}, ${b})`;
+            } else if (value < 0.4) {
+                // Cyan to Green
+                const t = (value - 0.2) / 0.2;
+                const r = 0;
+                const g = 255;
+                const b = Math.floor(255 * (1 - t));
+                return `rgb(${r}, ${g}, ${b})`;
+            } else if (value < 0.6) {
+                // Green to Yellow
+                const t = (value - 0.4) / 0.2;
+                const r = Math.floor(t * 255);
+                const g = 255;
+                const b = 0;
+                return `rgb(${r}, ${g}, ${b})`;
+            } else if (value < 0.8) {
+                // Yellow to Orange/Red
+                const t = (value - 0.6) / 0.2;
+                const r = 255;
+                const g = Math.floor(255 * (1 - t * 0.5));
+                const b = 0;
+                return `rgb(${r}, ${g}, ${b})`;
+            } else {
+                // Orange/Red to White
+                const t = (value - 0.8) / 0.2;
+                const r = 255;
+                const g = Math.floor(128 + t * 127);
+                const b = Math.floor(t * 255);
+                return `rgb(${r}, ${g}, ${b})`;
+            }
+        }
+
+        // Get color based on tws value
+        function getTwsColor(tws) {
+            if (!twsRange || twsRange.min === twsRange.max) {
+                return 'black';
+            }
+
+            // Normalize tws to 0-1 range
+            const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
+            return getColorFromValue(normalized);
         }
 
         // Animation functions
@@ -264,7 +334,7 @@
                 // Update info
                 const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
                 document.getElementById('progress-info').textContent =
-                    `Track: ${point.trackName} | Time: ${point.utc} | Progress: ${progress}%`;
+                    `Time: ${point.utc} | RPM: ${point.rpm} | TWS: ${point.tws.toFixed(1)} | Progress: ${progress}%`;
 
                 currentIndex++;
             }, delay);
