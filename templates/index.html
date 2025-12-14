@@ -202,10 +202,11 @@
         }
 
         // Create wind arrow icon
-        // twa: True Wind Angle (degrees)
         // tws: True Wind Speed
+        // twa: True Wind Angle (degrees) - relative to boat heading
+        // cog: Course Over Ground (degrees) - boat's heading/direction
         // twsRange: {min, max} for normalization
-        function createArrowIcon(tws, twa, twsRange) {
+        function createArrowIcon(tws, twa, cog, twsRange) {
             // Calculate arrow length based on TWS (normalize to 40-80 pixels)
             const minLength = 40;
             const maxLength = 80;
@@ -222,10 +223,13 @@
             const arrowheadWidth = 14;
             const arrowheadLength = 18;
 
+            // Calculate absolute wind direction (COG + TWA)
+            const absoluteWindDirection = cog + twa;
+
             // Create SVG arrow pointing towards where the wind is coming from
             const svg = `
                 <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${twa})">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${absoluteWindDirection})">
                         <!-- Arrow shaft -->
                         <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="blue" stroke-width="${lineWidth}" stroke-linecap="butt"/>
@@ -282,9 +286,10 @@
         }
 
         // Create AWA arrow icon (Apparent Wind Angle)
-        // awa: Apparent Wind Angle (degrees)
         // aws: Apparent Wind Speed (knots)
-        function createAWAArrowIcon(aws, awa) {
+        // awa: Apparent Wind Angle (degrees) - relative to boat heading
+        // cog: Course Over Ground (degrees) - boat's heading/direction
+        function createAWAArrowIcon(aws, awa, cog) {
             // Calculate arrow length based on AWS (normalize to 40-80 pixels)
             const minLength = 40;
             const maxLength = 80;
@@ -296,10 +301,13 @@
             const arrowheadWidth = 14;
             const arrowheadLength = 18;
 
+            // Calculate absolute apparent wind direction (COG + AWA)
+            const absoluteApparentWindDirection = cog + awa;
+
             // Create SVG arrow pointing towards where the apparent wind is coming from
             const svg = `
                 <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${awa})">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${absoluteApparentWindDirection})">
                         <!-- Arrow shaft -->
                         <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="orange" stroke-width="${lineWidth}" stroke-linecap="butt"/>
@@ -491,7 +499,7 @@
                 // Create wind arrow marker (blue)
                 if (allPoints.length > 0) {
                     const firstPoint = allPoints[0];
-                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, twsRange);
+                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, firstPoint.cog, twsRange);
                     windMarker = L.marker(
                         [firstPoint.lat, firstPoint.lon],
                         { icon: windArrowIcon }
@@ -505,7 +513,7 @@
                     ).addTo(map);
 
                     // Create AWA arrow marker (orange)
-                    const awaArrowIcon = createAWAArrowIcon(firstPoint.aws, firstPoint.awa);
+                    const awaArrowIcon = createAWAArrowIcon(firstPoint.aws, firstPoint.awa, firstPoint.cog);
                     awaMarker = L.marker(
                         [firstPoint.lat, firstPoint.lon],
                         { icon: awaArrowIcon }
@@ -594,7 +602,7 @@
 
                 // Update wind arrow position and icon (blue)
                 windMarker.setLatLng([point.lat, point.lon]);
-                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, twsRange);
+                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog, twsRange);
                 windMarker.setIcon(newWindArrowIcon);
 
                 // Update COG arrow position and icon (green)
@@ -604,7 +612,7 @@
 
                 // Update AWA arrow position and icon (orange)
                 awaMarker.setLatLng([point.lat, point.lon]);
-                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa);
+                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
                 awaMarker.setIcon(newAWAArrowIcon);
 
                 // Pan map to center on current position if enabled
