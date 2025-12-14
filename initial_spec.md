@@ -25,9 +25,10 @@ Sophisticated code user
 
 ## Update
 * Plot the line solid  when rpm field is zero, otherwise dotted
-* animate a blue line graphic arrow moving from the start to the end of the tracks. The arrow should point away from the twa and the length of the arrow is proportional to the tws
+* animate a blue line graphic arrow moving from the start to the end of the tracks. The arrow should point towards the twa and the length of the arrow is proportional to the tws
 * animate a green line graphic arrow moving from the start to the end of the tracks. The arrow should point towards the cog and the length of the arrow is proportional to the sog
-* display the values for date/time, lat, lon, cog, sog, rpm, and tws in the lower right during the animation
+* Have the speed control for the animation scale from 1/8 to 8x 
+* display the values for date/time, lat, lon, cog, sog, rpm, twa and tws in the lower right during the animation
 * add the buttons pan which will pan the map so that the boats position is centered and reverse to animate backwards
 * display a small legend explainin the arrows
 * Do not overwrite the track during the animation

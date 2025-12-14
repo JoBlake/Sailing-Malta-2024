@@ -142,8 +142,8 @@
 
         <div class="speed-control">
             <label for="speed-slider">Speed:</label>
-            <input type="range" id="speed-slider" min="1" max="10" value="5" />
-            <span id="speed-value">5x</span>
+            <input type="range" id="speed-slider" min="1" max="7" value="4" step="1" />
+            <span id="speed-value">1x</span>
         </div>
 
         <div class="info">
@@ -165,41 +165,68 @@
         let windMarker = null;
         let cogMarker = null;
         let trackPolylines = [];
-        let speed = 5;
+        let speed = 1;
         let panEnabled = false;
         let direction = 1; // 1 for forward, -1 for reverse
+
+        // Map slider values (1-7) to speed multipliers
+        function getSpeedMultiplier(sliderValue) {
+            const speedMap = {
+                1: 0.125,  // 1/8x
+                2: 0.25,   // 1/4x
+                3: 0.5,    // 1/2x
+                4: 1,      // 1x
+                5: 2,      // 2x
+                6: 4,      // 4x
+                7: 8       // 8x
+            };
+            return speedMap[sliderValue] || 1;
+        }
+
+        // Get display label for speed
+        function getSpeedLabel(sliderValue) {
+            const labelMap = {
+                1: '1/8x',
+                2: '1/4x',
+                3: '1/2x',
+                4: '1x',
+                5: '2x',
+                6: '4x',
+                7: '8x'
+            };
+            return labelMap[sliderValue] || '1x';
+        }
 
         // Create wind arrow icon
         // twa: True Wind Angle (degrees)
         // tws: True Wind Speed
         // twsRange: {min, max} for normalization
         function createArrowIcon(tws, twa, twsRange) {
-            // Calculate arrow length based on TWS (normalize to 20-60 pixels)
-            const minLength = 20;
-            const maxLength = 60;
+            // Calculate arrow length based on TWS (normalize to 30-70 pixels)
+            const minLength = 30;
+            const maxLength = 70;
             let length = minLength;
 
             if (twsRange && twsRange.max > twsRange.min) {
                 const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
                 length = minLength + normalized * (maxLength - minLength);
             } else if (tws > 0) {
-                length = 40; // Default if no range
+                length = 50; // Default if no range
             }
 
-            const width = 8;
-            const headLength = 12;
-            const headWidth = 16;
+            const lineWidth = 3;
+            const arrowheadSize = 10;
 
             // Create SVG arrow pointing upward (will be rotated away from TWA by adding 180 degrees)
             const svg = `
-                <svg width="${length + 10}" height="${length + 10}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 10) / 2}, ${(length + 10) / 2}) rotate(${twa + 180})">
-                        <!-- Arrow shaft -->
+                <svg width="${length + 20}" height="${length + 20}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 20) / 2}, ${(length + 20) / 2}) rotate(${twa + 180})">
+                        <!-- Arrow line -->
                         <line x1="0" y1="0" x2="0" y2="${-length}"
-                              stroke="blue" stroke-width="${width}" stroke-linecap="round"/>
-                        <!-- Arrow head -->
-                        <polygon points="0,${-length} ${headWidth/2},${-length + headLength} ${-headWidth/2},${-length + headLength}"
-                                 fill="blue"/>
+                              stroke="blue" stroke-width="${lineWidth}" stroke-linecap="butt"/>
+                        <!-- Arrowhead -->
+                        <path d="M 0,${-length} L ${-arrowheadSize},${-length + arrowheadSize * 1.5} L 0,${-length + arrowheadSize * 0.5} L ${arrowheadSize},${-length + arrowheadSize * 1.5} Z"
+                              fill="blue" stroke="blue" stroke-width="1" stroke-linejoin="miter"/>
                     </g>
                 </svg>
             `;
@@ -207,8 +234,8 @@
             return L.divIcon({
                 className: 'wind-arrow',
                 html: svg,
-                iconSize: [length + 10, length + 10],
-                iconAnchor: [(length + 10) / 2, (length + 10) / 2]
+                iconSize: [length + 20, length + 20],
+                iconAnchor: [(length + 20) / 2, (length + 20) / 2]
             });
         }
 
@@ -216,27 +243,27 @@
         // cog: Course Over Ground (degrees)
         // sog: Speed Over Ground (knots)
         function createCOGArrowIcon(sog, cog) {
-            // Calculate arrow length based on SOG (normalize to 20-60 pixels)
-            const minLength = 20;
-            const maxLength = 60;
+            // Calculate arrow length based on SOG (normalize to 30-70 pixels)
+            const minLength = 30;
+            const maxLength = 70;
             // Assume SOG range 0-10 knots for scaling
             const normalized = Math.min(sog / 10, 1);
             const length = minLength + normalized * (maxLength - minLength);
 
-            const width = 8;
-            const headLength = 12;
-            const headWidth = 16;
+            const lineWidth = 3;
+            const arrowheadWidth = 12;
+            const arrowheadLength = 15;
 
             // Create SVG arrow pointing upward (will be rotated by COG)
             const svg = `
-                <svg width="${length + 10}" height="${length + 10}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 10) / 2}, ${(length + 10) / 2}) rotate(${cog})">
-                        <!-- Arrow shaft -->
-                        <line x1="0" y1="0" x2="0" y2="${-length}"
-                              stroke="green" stroke-width="${width}" stroke-linecap="round"/>
-                        <!-- Arrow head -->
-                        <polygon points="0,${-length} ${headWidth/2},${-length + headLength} ${-headWidth/2},${-length + headLength}"
-                                 fill="green"/>
+                <svg width="${length + 20}" height="${length + 20}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 20) / 2}, ${(length + 20) / 2}) rotate(${cog})">
+                        <!-- Arrow line -->
+                        <line x1="0" y1="0" x2="0" y2="${-length + arrowheadLength * 0.3}"
+                              stroke="green" stroke-width="${lineWidth}" stroke-linecap="butt"/>
+                        <!-- Arrowhead - classic triangle -->
+                        <path d="M 0,${-length} L ${-arrowheadWidth/2},${-length + arrowheadLength} L ${arrowheadWidth/2},${-length + arrowheadLength} Z"
+                              fill="green" stroke="green" stroke-width="1" stroke-linejoin="miter"/>
                     </g>
                 </svg>
             `;
@@ -244,8 +271,8 @@
             return L.divIcon({
                 className: 'wind-arrow',
                 html: svg,
-                iconSize: [length + 10, length + 10],
-                iconAnchor: [(length + 10) / 2, (length + 10) / 2]
+                iconSize: [length + 20, length + 20],
+                iconAnchor: [(length + 20) / 2, (length + 20) / 2]
             });
         }
 
@@ -356,16 +383,16 @@
                         <div class="legend-title">Arrow Legend</div>
                         <div style="margin-top: 5px;">
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
-                                <svg width="30" height="20" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="5" y1="10" x2="20" y2="10" stroke="blue" stroke-width="3" stroke-linecap="round"/>
-                                    <polygon points="20,10 16,7 16,13" fill="blue"/>
+                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="5" y1="10" x2="25" y2="10" stroke="blue" stroke-width="3"/>
+                                    <path d="M 25,10 L 20,7 L 22,10 L 20,13 Z" fill="blue" stroke="blue" stroke-width="1"/>
                                 </svg>
                                 <span style="font-size: 11px;">Wind (TWA/TWS)</span>
                             </div>
                             <div style="display: flex; align-items: center; gap: 8px;">
-                                <svg width="30" height="20" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="5" y1="10" x2="20" y2="10" stroke="green" stroke-width="3" stroke-linecap="round"/>
-                                    <polygon points="20,10 16,7 16,13" fill="green"/>
+                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="5" y1="10" x2="21" y2="10" stroke="green" stroke-width="3"/>
+                                    <path d="M 28,10 L 21,7 L 21,13 Z" fill="green" stroke="green" stroke-width="1"/>
                                 </svg>
                                 <span style="font-size: 11px;">Boat (COG/SOG)</span>
                             </div>
@@ -490,7 +517,7 @@
                 // Update info
                 const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
                 document.getElementById('progress-info').textContent =
-                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | COG: ${point.cog.toFixed(1)}° | SOG: ${point.sog.toFixed(2)} kt | RPM: ${point.rpm} | TWS: ${point.tws.toFixed(1)}`;
+                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | COG: ${point.cog.toFixed(1)}° | SOG: ${point.sog.toFixed(2)} kt | RPM: ${point.rpm} | TWA: ${point.twa.toFixed(1)}° | TWS: ${point.tws.toFixed(1)}`;
 
                 currentIndex += direction;
             }, delay);
@@ -565,8 +592,9 @@
         });
 
         document.getElementById('speed-slider').addEventListener('input', (e) => {
-            speed = parseInt(e.target.value);
-            document.getElementById('speed-value').textContent = `${speed}x`;
+            const sliderValue = parseInt(e.target.value);
+            speed = getSpeedMultiplier(sliderValue);
+            document.getElementById('speed-value').textContent = getSpeedLabel(sliderValue);
 
             // Restart animation with new speed if currently playing
             if (animationInterval) {
