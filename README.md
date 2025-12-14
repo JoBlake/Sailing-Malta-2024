@@ -21,6 +21,8 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 - Arrow legend explaining wind and boat movement indicators
 - Adjustable animation speed (1x to 10x)
 - Play, pause, and reset controls
+- Reverse animation to play backwards through the track
+- Auto-pan option to keep boat centered on map during animation
 - Displays real-time information during animation:
   - Date/Time (UTC)
   - Latitude and Longitude coordinates
@@ -87,6 +89,8 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
    - **Play**: Start the animation
    - **Pause**: Pause the animation
    - **Reset**: Reset to the beginning
+   - **Reverse**: Toggle reverse animation (play backwards)
+   - **Pan**: Toggle auto-panning to keep boat centered on map
    - **Speed slider**: Adjust animation speed from 1x to 10x
 
 ## JSON File Format

@@ -137,6 +137,8 @@
         <button id="play-btn">Play</button>
         <button id="pause-btn" disabled>Pause</button>
         <button id="reset-btn">Reset</button>
+        <button id="reverse-btn">Reverse</button>
+        <button id="pan-btn">Pan</button>
 
         <div class="speed-control">
             <label for="speed-slider">Speed:</label>
@@ -164,6 +166,8 @@
         let cogMarker = null;
         let trackPolylines = [];
         let speed = 5;
+        let panEnabled = false;
+        let direction = 1; // 1 for forward, -1 for reverse
 
         // Create wind arrow icon
         // twa: True Wind Angle (degrees)
@@ -456,7 +460,12 @@
             const delay = baseDelay / speed;
 
             animationInterval = setInterval(() => {
-                if (currentIndex >= allPoints.length) {
+                // Check bounds based on direction
+                if (direction === 1 && currentIndex >= allPoints.length) {
+                    stopAnimation();
+                    return;
+                }
+                if (direction === -1 && currentIndex < 0) {
                     stopAnimation();
                     return;
                 }
@@ -473,12 +482,17 @@
                 const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
                 cogMarker.setIcon(newCOGArrowIcon);
 
+                // Pan map to center on current position if enabled
+                if (panEnabled) {
+                    map.panTo([point.lat, point.lon]);
+                }
+
                 // Update info
                 const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
                 document.getElementById('progress-info').textContent =
                     `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | COG: ${point.cog.toFixed(1)}° | SOG: ${point.sog.toFixed(2)} kt | RPM: ${point.rpm} | TWS: ${point.tws.toFixed(1)}`;
 
-                currentIndex++;
+                currentIndex += direction;
             }, delay);
         }
 
@@ -499,6 +513,12 @@
         function resetAnimation() {
             pauseAnimation();
             currentIndex = 0;
+            direction = 1;
+
+            // Reset Reverse button appearance
+            const reverseBtn = document.getElementById('reverse-btn');
+            reverseBtn.style.background = '#007bff';
+            reverseBtn.textContent = 'Reverse';
 
             if (allPoints.length > 0) {
                 windMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
@@ -513,6 +533,36 @@
         document.getElementById('play-btn').addEventListener('click', startAnimation);
         document.getElementById('pause-btn').addEventListener('click', pauseAnimation);
         document.getElementById('reset-btn').addEventListener('click', resetAnimation);
+
+        document.getElementById('pan-btn').addEventListener('click', () => {
+            panEnabled = !panEnabled;
+            const btn = document.getElementById('pan-btn');
+            if (panEnabled) {
+                btn.style.background = '#28a745';
+                btn.textContent = 'Pan: ON';
+            } else {
+                btn.style.background = '#007bff';
+                btn.textContent = 'Pan';
+            }
+        });
+
+        document.getElementById('reverse-btn').addEventListener('click', () => {
+            direction = -direction;
+            const btn = document.getElementById('reverse-btn');
+            if (direction === -1) {
+                btn.style.background = '#ffc107';
+                btn.textContent = 'Reverse: ON';
+            } else {
+                btn.style.background = '#007bff';
+                btn.textContent = 'Reverse';
+            }
+
+            // Restart animation with new direction if currently playing
+            if (animationInterval) {
+                pauseAnimation();
+                startAnimation();
+            }
+        });
 
         document.getElementById('speed-slider').addEventListener('input', (e) => {
             speed = parseInt(e.target.value);
