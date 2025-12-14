@@ -222,10 +222,10 @@
             const arrowheadWidth = 14;
             const arrowheadLength = 18;
 
-            // Create SVG arrow pointing upward (will be rotated away from TWA by adding 180 degrees)
+            // Create SVG arrow pointing towards where the wind is coming from
             const svg = `
                 <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${twa + 180})">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${twa})">
                         <!-- Arrow shaft -->
                         <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="blue" stroke-width="${lineWidth}" stroke-linecap="butt"/>
@@ -296,10 +296,10 @@
             const arrowheadWidth = 14;
             const arrowheadLength = 18;
 
-            // Create SVG arrow pointing upward (will be rotated away from AWA by adding 180 degrees)
+            // Create SVG arrow pointing towards where the apparent wind is coming from
             const svg = `
                 <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${awa + 180})">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${awa})">
                         <!-- Arrow shaft -->
                         <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="orange" stroke-width="${lineWidth}" stroke-linecap="butt"/>
