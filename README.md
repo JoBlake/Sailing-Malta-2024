@@ -5,28 +5,31 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 ## Features
 
 - Displays multiple sailing tracks on an interactive OpenStreetMap
-- Color-coded track segments based on engine RPM and wind speed:
-  - **Black**: Engine running (RPM > 0) - motoring
-  - **Color gradient**: Sailing under wind power (RPM = 0) - colored by true wind speed (TWS)
-    - Uses CMRmap colormap (Color Map for Remote sensing)
-    - Black/Dark red = low wind speed
-    - Red/Magenta = moderate wind speed
-    - Blue/White = high wind speed
-- Interactive TWS color legend in bottom-left corner:
-  - Shows CMRmap gradient from minimum to maximum wind speed when sailing
-  - Includes min, middle, and max TWS values
-  - Notes that black lines indicate engine running (RPM > 0)
-- Animates a boat icon moving along all tracks in chronological order
-  - Original track remains fully visible (no overlaying animation trail)
+- Track line style based on engine RPM:
+  - **Solid line**: Sailing under wind power (RPM = 0)
+  - **Dotted line**: Motoring with engine (RPM > 0)
+- Dual-arrow animation system showing both wind and boat movement:
+  - **Blue arrow**: Wind conditions
+    - Points away from True Wind Angle (TWA)
+    - Length proportional to True Wind Speed (TWS)
+    - Shows wind direction and strength
+  - **Green arrow**: Boat movement
+    - Points toward Course Over Ground (COG)
+    - Length proportional to Speed Over Ground (SOG)
+    - Shows actual boat direction and speed
 - Shows start (green) and end (red) markers for each track
+- Arrow legend explaining wind and boat movement indicators
 - Adjustable animation speed (1x to 10x)
 - Play, pause, and reset controls
 - Displays real-time information during animation:
   - Date/Time (UTC)
   - Latitude and Longitude coordinates
+  - Course Over Ground (COG) in degrees
+  - Speed Over Ground (SOG) in knots
   - Engine RPM
   - True Wind Speed (TWS)
 - Automatically fits the map to show all tracks
+- Original track remains fully visible (no overlaying animation trail)
 
 ## Prerequisites
 
@@ -97,6 +100,7 @@ The application expects JSON files with the following structure:
     "lon": "20.9019872",
     "rpm": "1327",
     "tws": "5.2",
+    "twa": "-65.6",
     "utc": "2024-08-21 11:26:00",
     "sog": "0.00",
     "cog": "35.8"
@@ -108,7 +112,8 @@ Required fields:
 - `lat`: Latitude coordinate
 - `lon`: Longitude coordinate
 - `rpm`: Engine RPM (0 = engine off, >0 = engine running)
-- `tws`: True wind speed (used for color coding when engine is running)
+- `tws`: True wind speed (used for color coding and arrow length)
+- `twa`: True wind angle in degrees (used for arrow rotation)
 
 Optional fields (displayed in info panel):
 - `utc`: Timestamp

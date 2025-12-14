@@ -71,9 +71,14 @@
             color: #333;
         }
 
-        .boat-icon {
-            text-align: center;
-            font-size: 24px;
+        .wind-arrow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wind-arrow svg {
+            display: block;
         }
 
         .loading {
@@ -155,9 +160,90 @@
         let allPoints = [];
         let currentIndex = 0;
         let animationInterval = null;
-        let boatMarker = null;
+        let windMarker = null;
+        let cogMarker = null;
         let trackPolylines = [];
         let speed = 5;
+
+        // Create wind arrow icon
+        // twa: True Wind Angle (degrees)
+        // tws: True Wind Speed
+        // twsRange: {min, max} for normalization
+        function createArrowIcon(tws, twa, twsRange) {
+            // Calculate arrow length based on TWS (normalize to 20-60 pixels)
+            const minLength = 20;
+            const maxLength = 60;
+            let length = minLength;
+
+            if (twsRange && twsRange.max > twsRange.min) {
+                const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
+                length = minLength + normalized * (maxLength - minLength);
+            } else if (tws > 0) {
+                length = 40; // Default if no range
+            }
+
+            const width = 8;
+            const headLength = 12;
+            const headWidth = 16;
+
+            // Create SVG arrow pointing upward (will be rotated away from TWA by adding 180 degrees)
+            const svg = `
+                <svg width="${length + 10}" height="${length + 10}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 10) / 2}, ${(length + 10) / 2}) rotate(${twa + 180})">
+                        <!-- Arrow shaft -->
+                        <line x1="0" y1="0" x2="0" y2="${-length}"
+                              stroke="blue" stroke-width="${width}" stroke-linecap="round"/>
+                        <!-- Arrow head -->
+                        <polygon points="0,${-length} ${headWidth/2},${-length + headLength} ${-headWidth/2},${-length + headLength}"
+                                 fill="blue"/>
+                    </g>
+                </svg>
+            `;
+
+            return L.divIcon({
+                className: 'wind-arrow',
+                html: svg,
+                iconSize: [length + 10, length + 10],
+                iconAnchor: [(length + 10) / 2, (length + 10) / 2]
+            });
+        }
+
+        // Create COG arrow icon (Course Over Ground)
+        // cog: Course Over Ground (degrees)
+        // sog: Speed Over Ground (knots)
+        function createCOGArrowIcon(sog, cog) {
+            // Calculate arrow length based on SOG (normalize to 20-60 pixels)
+            const minLength = 20;
+            const maxLength = 60;
+            // Assume SOG range 0-10 knots for scaling
+            const normalized = Math.min(sog / 10, 1);
+            const length = minLength + normalized * (maxLength - minLength);
+
+            const width = 8;
+            const headLength = 12;
+            const headWidth = 16;
+
+            // Create SVG arrow pointing upward (will be rotated by COG)
+            const svg = `
+                <svg width="${length + 10}" height="${length + 10}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 10) / 2}, ${(length + 10) / 2}) rotate(${cog})">
+                        <!-- Arrow shaft -->
+                        <line x1="0" y1="0" x2="0" y2="${-length}"
+                              stroke="green" stroke-width="${width}" stroke-linecap="round"/>
+                        <!-- Arrow head -->
+                        <polygon points="0,${-length} ${headWidth/2},${-length + headLength} ${-headWidth/2},${-length + headLength}"
+                                 fill="green"/>
+                    </g>
+                </svg>
+            `;
+
+            return L.divIcon({
+                className: 'wind-arrow',
+                html: svg,
+                iconSize: [length + 10, length + 10],
+                iconAnchor: [(length + 10) / 2, (length + 10) / 2]
+            });
+        }
 
         // Initialize the map
         async function initMap() {
@@ -187,30 +273,28 @@
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 }).addTo(map);
 
-                // Draw all tracks on the map with color based on RPM and TWS
+                // Draw all tracks on the map with line style based on RPM
                 tracks.forEach((track, index) => {
-                    // Draw segments based on RPM and TWS
+                    // Draw segments: solid when rpm=0 (sailing), dotted when rpm>0 (motoring)
                     for (let i = 0; i < track.points.length - 1; i++) {
                         const p1 = track.points[i];
                         const p2 = track.points[i + 1];
 
-                        let color;
-                        // If either point has RPM > 0, draw black
-                        if (p1.rpm > 0 || p2.rpm > 0) {
-                            color = 'black';
+                        // Determine line style based on RPM
+                        let dashArray;
+                        if (p1.rpm === 0 && p2.rpm === 0) {
+                            dashArray = null; // Solid line for sailing
                         } else {
-                            // Use tws-based color when sailing (RPM = 0)
-                            // Average the tws values of the two points
-                            const avgTws = (p1.tws + p2.tws) / 2;
-                            color = getTwsColor(avgTws);
+                            dashArray = '5, 10'; // Dotted line for motoring
                         }
 
                         const segment = L.polyline(
                             [[p1.lat, p1.lon], [p2.lat, p2.lon]],
                             {
-                                color: color,
+                                color: 'blue',
                                 weight: 3,
-                                opacity: 0.7
+                                opacity: 0.7,
+                                dashArray: dashArray
                             }
                         ).addTo(map);
                         trackPolylines.push(segment);
@@ -260,58 +344,47 @@
                     ]);
                 }
 
-                // Create TWS color legend
-                if (twsRange) {
-                    const legend = L.control({ position: 'bottomleft' });
+                // Add legend for arrows
+                const legend = L.control({ position: 'bottomleft' });
+                legend.onAdd = function(map) {
+                    const div = L.DomUtil.create('div', 'legend');
+                    div.innerHTML = `
+                        <div class="legend-title">Arrow Legend</div>
+                        <div style="margin-top: 5px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                                <svg width="30" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="5" y1="10" x2="20" y2="10" stroke="blue" stroke-width="3" stroke-linecap="round"/>
+                                    <polygon points="20,10 16,7 16,13" fill="blue"/>
+                                </svg>
+                                <span style="font-size: 11px;">Wind (TWA/TWS)</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <svg width="30" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="5" y1="10" x2="20" y2="10" stroke="green" stroke-width="3" stroke-linecap="round"/>
+                                    <polygon points="20,10 16,7 16,13" fill="green"/>
+                                </svg>
+                                <span style="font-size: 11px;">Boat (COG/SOG)</span>
+                            </div>
+                        </div>
+                    `;
+                    return div;
+                };
+                legend.addTo(map);
 
-                    legend.onAdd = function(map) {
-                        const div = L.DomUtil.create('div', 'legend');
-
-                        // Title
-                        div.innerHTML = '<div class="legend-title">True Wind Speed (TWS)<br><span style="font-size: 10px; font-weight: normal;">CMRmap</span></div>';
-
-                        // Create gradient bar
-                        const gradientDiv = L.DomUtil.create('div', 'legend-scale', div);
-
-                        // Create 20 segments for smooth gradient
-                        for (let i = 0; i < 20; i++) {
-                            const segment = L.DomUtil.create('div', '', gradientDiv);
-                            const value = i / 19;
-                            const color = getColorFromValue(value);
-                            segment.style.flex = '1';
-                            segment.style.background = color;
-                        }
-
-                        // Labels
-                        const labelsDiv = L.DomUtil.create('div', 'legend-labels', div);
-                        labelsDiv.innerHTML = `
-                            <span>${twsRange.min.toFixed(1)}</span>
-                            <span>${((twsRange.min + twsRange.max) / 2).toFixed(1)}</span>
-                            <span>${twsRange.max.toFixed(1)}</span>
-                        `;
-
-                        // Note
-                        const noteDiv = L.DomUtil.create('div', 'legend-note', div);
-                        noteDiv.innerHTML = 'Black = Engine running (RPM > 0)';
-
-                        return div;
-                    };
-
-                    legend.addTo(map);
-                }
-
-                // Create boat marker (initially hidden)
-                const boatIcon = L.divIcon({
-                    className: 'boat-icon',
-                    html: '⛵',
-                    iconSize: [30, 30],
-                    iconAnchor: [15, 15]
-                });
-
+                // Create wind arrow marker (blue)
                 if (allPoints.length > 0) {
-                    boatMarker = L.marker(
-                        [allPoints[0].lat, allPoints[0].lon],
-                        { icon: boatIcon }
+                    const firstPoint = allPoints[0];
+                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, twsRange);
+                    windMarker = L.marker(
+                        [firstPoint.lat, firstPoint.lon],
+                        { icon: windArrowIcon }
+                    ).addTo(map);
+
+                    // Create COG arrow marker (green)
+                    const cogArrowIcon = createCOGArrowIcon(firstPoint.sog, firstPoint.cog);
+                    cogMarker = L.marker(
+                        [firstPoint.lat, firstPoint.lon],
+                        { icon: cogArrowIcon }
                     ).addTo(map);
                 }
 
@@ -390,13 +463,20 @@
 
                 const point = allPoints[currentIndex];
 
-                // Update boat marker position
-                boatMarker.setLatLng([point.lat, point.lon]);
+                // Update wind arrow position and icon (blue)
+                windMarker.setLatLng([point.lat, point.lon]);
+                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, twsRange);
+                windMarker.setIcon(newWindArrowIcon);
+
+                // Update COG arrow position and icon (green)
+                cogMarker.setLatLng([point.lat, point.lon]);
+                const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
+                cogMarker.setIcon(newCOGArrowIcon);
 
                 // Update info
                 const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
                 document.getElementById('progress-info').textContent =
-                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | RPM: ${point.rpm} | TWS: ${point.tws.toFixed(1)}`;
+                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | COG: ${point.cog.toFixed(1)}° | SOG: ${point.sog.toFixed(2)} kt | RPM: ${point.rpm} | TWS: ${point.tws.toFixed(1)}`;
 
                 currentIndex++;
             }, delay);
@@ -421,7 +501,8 @@
             currentIndex = 0;
 
             if (allPoints.length > 0) {
-                boatMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
+                windMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
+                cogMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
             }
 
             document.getElementById('progress-info').textContent = 'Ready to play';

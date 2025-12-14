@@ -21,14 +21,16 @@ def load_track_data():
                 lon = float(point['lon'])
                 rpm = int(point.get('rpm', 0))
                 tws = float(point.get('tws', 0))
+                twa = float(point.get('twa', 0))
                 track.append({
                     'lat': lat,
                     'lon': lon,
                     'rpm': rpm,
                     'tws': tws,
+                    'twa': twa,
                     'utc': point.get('utc', ''),
-                    'sog': point.get('sog', 0),
-                    'cog': point.get('cog', 0)
+                    'sog': float(point.get('sog', 0)),
+                    'cog': float(point.get('cog', 0))
                 })
                 all_coords.append([lat, lon])
                 if rpm == 0:  # Only collect tws values when sailing (engine off)

@@ -11,7 +11,6 @@ Sophisticated code user
 ## Use case
 
 * display map bounded by the minimum and maximum latitude and longitude coordinates in a list of json files
-* animate an icon moving from the start to the end of the tracks
 * graph the path documented in the json files
  
 
@@ -25,8 +24,9 @@ Sophisticated code user
 * Create a readme with usage instructions
 
 ## Update
-* Plot the line black when rpm field is not zero
-* When rpm is zero, plot the line color as a function of the value tws in the jason file. Use the CMRmap color map. Normalize the tws value to use the full range of the color map
-* insert a legend showing the color of a tws value 
-* display the values for date/time, lat, lon, rpm, and tws in the lower right during the animation
+* Plot the line solid  when rpm field is zero, otherwise dotted
+* animate a blue line graphic arrow moving from the start to the end of the tracks. The arrow should point away from the twa and the length of the arrow is proportional to the tws
+* animate a green line graphic arrow moving from the start to the end of the tracks. The arrow should point towards the cog and the length of the arrow is proportional to the sog
+* display the values for date/time, lat, lon, cog, sog, rpm, and tws in the lower right during the animation
+* display a small legend explainin the arrows
 * Do not overwrite the track during the animation
