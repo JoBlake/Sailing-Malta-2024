@@ -30,7 +30,9 @@ def load_track_data():
                     'twa': twa,
                     'utc': point.get('utc', ''),
                     'sog': float(point.get('sog', 0)),
-                    'cog': float(point.get('cog', 0))
+                    'cog': float(point.get('cog', 0)),
+                    'aws': float(point.get('aws', 0)),
+                    'awa': float(point.get('awa', 0))
                 })
                 all_coords.append([lat, lon])
                 if rpm == 0:  # Only collect tws values when sailing (engine off)

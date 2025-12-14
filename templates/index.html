@@ -164,10 +164,14 @@
         let animationInterval = null;
         let windMarker = null;
         let cogMarker = null;
+        let awaMarker = null;
         let trackPolylines = [];
         let speed = 1;
         let panEnabled = false;
         let direction = 1; // 1 for forward, -1 for reverse
+        let showWindArrow = true;
+        let showCogArrow = true;
+        let showAwaArrow = true;
 
         // Map slider values (1-7) to speed multipliers
         function getSpeedMultiplier(sliderValue) {
@@ -202,31 +206,32 @@
         // tws: True Wind Speed
         // twsRange: {min, max} for normalization
         function createArrowIcon(tws, twa, twsRange) {
-            // Calculate arrow length based on TWS (normalize to 30-70 pixels)
-            const minLength = 30;
-            const maxLength = 70;
+            // Calculate arrow length based on TWS (normalize to 40-80 pixels)
+            const minLength = 40;
+            const maxLength = 80;
             let length = minLength;
 
             if (twsRange && twsRange.max > twsRange.min) {
                 const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
                 length = minLength + normalized * (maxLength - minLength);
             } else if (tws > 0) {
-                length = 50; // Default if no range
+                length = 60; // Default if no range
             }
 
-            const lineWidth = 3;
-            const arrowheadSize = 10;
+            const lineWidth = 4;
+            const arrowheadWidth = 14;
+            const arrowheadLength = 18;
 
             // Create SVG arrow pointing upward (will be rotated away from TWA by adding 180 degrees)
             const svg = `
-                <svg width="${length + 20}" height="${length + 20}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 20) / 2}, ${(length + 20) / 2}) rotate(${twa + 180})">
-                        <!-- Arrow line -->
-                        <line x1="0" y1="0" x2="0" y2="${-length}"
+                <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${twa + 180})">
+                        <!-- Arrow shaft -->
+                        <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="blue" stroke-width="${lineWidth}" stroke-linecap="butt"/>
-                        <!-- Arrowhead -->
-                        <path d="M 0,${-length} L ${-arrowheadSize},${-length + arrowheadSize * 1.5} L 0,${-length + arrowheadSize * 0.5} L ${arrowheadSize},${-length + arrowheadSize * 1.5} Z"
-                              fill="blue" stroke="blue" stroke-width="1" stroke-linejoin="miter"/>
+                        <!-- Arrowhead - solid triangle -->
+                        <polygon points="0,${-length} ${-arrowheadWidth/2},${-length + arrowheadLength} ${arrowheadWidth/2},${-length + arrowheadLength}"
+                                 fill="blue" stroke="none"/>
                     </g>
                 </svg>
             `;
@@ -234,8 +239,8 @@
             return L.divIcon({
                 className: 'wind-arrow',
                 html: svg,
-                iconSize: [length + 20, length + 20],
-                iconAnchor: [(length + 20) / 2, (length + 20) / 2]
+                iconSize: [length + 30, length + 30],
+                iconAnchor: [(length + 30) / 2, (length + 30) / 2]
             });
         }
 
@@ -243,36 +248,73 @@
         // cog: Course Over Ground (degrees)
         // sog: Speed Over Ground (knots)
         function createCOGArrowIcon(sog, cog) {
-            // Calculate arrow length based on SOG (normalize to 30-70 pixels)
-            const minLength = 30;
-            const maxLength = 70;
+            // Calculate arrow length based on SOG (normalize to 40-80 pixels)
+            const minLength = 40;
+            const maxLength = 80;
             // Assume SOG range 0-10 knots for scaling
             const normalized = Math.min(sog / 10, 1);
             const length = minLength + normalized * (maxLength - minLength);
 
-            const lineWidth = 3;
-            const arrowheadWidth = 12;
-            const arrowheadLength = 15;
+            const lineWidth = 4;
+            const arrowheadWidth = 14;
+            const arrowheadLength = 18;
 
             // Create SVG arrow pointing upward (will be rotated by COG)
             const svg = `
-                <svg width="${length + 20}" height="${length + 20}" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(${(length + 20) / 2}, ${(length + 20) / 2}) rotate(${cog})">
-                        <!-- Arrow line -->
-                        <line x1="0" y1="0" x2="0" y2="${-length + arrowheadLength * 0.3}"
+                <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${cog})">
+                        <!-- Arrow shaft -->
+                        <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
                               stroke="green" stroke-width="${lineWidth}" stroke-linecap="butt"/>
-                        <!-- Arrowhead - classic triangle -->
-                        <path d="M 0,${-length} L ${-arrowheadWidth/2},${-length + arrowheadLength} L ${arrowheadWidth/2},${-length + arrowheadLength} Z"
-                              fill="green" stroke="green" stroke-width="1" stroke-linejoin="miter"/>
+                        <!-- Arrowhead - solid triangle -->
+                        <polygon points="0,${-length} ${-arrowheadWidth/2},${-length + arrowheadLength} ${arrowheadWidth/2},${-length + arrowheadLength}"
+                                 fill="green" stroke="none"/>
                     </g>
                 </svg>
             `;
 
             return L.divIcon({
-                className: 'wind-arrow',
+                className: 'cog-arrow',
                 html: svg,
-                iconSize: [length + 20, length + 20],
-                iconAnchor: [(length + 20) / 2, (length + 20) / 2]
+                iconSize: [length + 30, length + 30],
+                iconAnchor: [(length + 30) / 2, (length + 30) / 2]
+            });
+        }
+
+        // Create AWA arrow icon (Apparent Wind Angle)
+        // awa: Apparent Wind Angle (degrees)
+        // aws: Apparent Wind Speed (knots)
+        function createAWAArrowIcon(aws, awa) {
+            // Calculate arrow length based on AWS (normalize to 40-80 pixels)
+            const minLength = 40;
+            const maxLength = 80;
+            // Assume AWS range 0-15 knots for scaling
+            const normalized = Math.min(aws / 15, 1);
+            const length = minLength + normalized * (maxLength - minLength);
+
+            const lineWidth = 4;
+            const arrowheadWidth = 14;
+            const arrowheadLength = 18;
+
+            // Create SVG arrow pointing upward (will be rotated away from AWA by adding 180 degrees)
+            const svg = `
+                <svg width="${length + 30}" height="${length + 30}" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(${(length + 30) / 2}, ${(length + 30) / 2}) rotate(${awa + 180})">
+                        <!-- Arrow shaft -->
+                        <line x1="0" y1="5" x2="0" y2="${-length + arrowheadLength}"
+                              stroke="orange" stroke-width="${lineWidth}" stroke-linecap="butt"/>
+                        <!-- Arrowhead - solid triangle -->
+                        <polygon points="0,${-length} ${-arrowheadWidth/2},${-length + arrowheadLength} ${arrowheadWidth/2},${-length + arrowheadLength}"
+                                 fill="orange" stroke="none"/>
+                    </g>
+                </svg>
+            `;
+
+            return L.divIcon({
+                className: 'awa-arrow',
+                html: svg,
+                iconSize: [length + 30, length + 30],
+                iconAnchor: [(length + 30) / 2, (length + 30) / 2]
             });
         }
 
@@ -375,32 +417,76 @@
                     ]);
                 }
 
-                // Add legend for arrows
+                // Add legend for arrows with checkboxes
                 const legend = L.control({ position: 'bottomleft' });
                 legend.onAdd = function(map) {
                     const div = L.DomUtil.create('div', 'legend');
                     div.innerHTML = `
                         <div class="legend-title">Arrow Legend</div>
                         <div style="margin-top: 5px;">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
+                                <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
                                 <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
                                     <line x1="5" y1="10" x2="25" y2="10" stroke="blue" stroke-width="3"/>
                                     <path d="M 25,10 L 20,7 L 22,10 L 20,13 Z" fill="blue" stroke="blue" stroke-width="1"/>
                                 </svg>
                                 <span style="font-size: 11px;">Wind (TWA/TWS)</span>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
+                                <input type="checkbox" id="toggle-cog" checked style="cursor: pointer;">
                                 <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
                                     <line x1="5" y1="10" x2="21" y2="10" stroke="green" stroke-width="3"/>
                                     <path d="M 28,10 L 21,7 L 21,13 Z" fill="green" stroke="green" stroke-width="1"/>
                                 </svg>
                                 <span style="font-size: 11px;">Boat (COG/SOG)</span>
                             </div>
+                            <div style="display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
+                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
+                                    <line x1="5" y1="10" x2="21" y2="10" stroke="orange" stroke-width="3"/>
+                                    <path d="M 28,10 L 21,7 L 21,13 Z" fill="orange" stroke="orange" stroke-width="1"/>
+                                </svg>
+                                <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
+                            </div>
                         </div>
                     `;
+
+                    // Prevent clicks on the legend from propagating to the map
+                    L.DomEvent.disableClickPropagation(div);
+
                     return div;
                 };
                 legend.addTo(map);
+
+                // Add event listeners for arrow toggles
+                setTimeout(() => {
+                    document.getElementById('toggle-wind').addEventListener('change', (e) => {
+                        showWindArrow = e.target.checked;
+                        if (showWindArrow) {
+                            windMarker.addTo(map);
+                        } else {
+                            map.removeLayer(windMarker);
+                        }
+                    });
+
+                    document.getElementById('toggle-cog').addEventListener('change', (e) => {
+                        showCogArrow = e.target.checked;
+                        if (showCogArrow) {
+                            cogMarker.addTo(map);
+                        } else {
+                            map.removeLayer(cogMarker);
+                        }
+                    });
+
+                    document.getElementById('toggle-awa').addEventListener('change', (e) => {
+                        showAwaArrow = e.target.checked;
+                        if (showAwaArrow) {
+                            awaMarker.addTo(map);
+                        } else {
+                            map.removeLayer(awaMarker);
+                        }
+                    });
+                }, 100);
 
                 // Create wind arrow marker (blue)
                 if (allPoints.length > 0) {
@@ -416,6 +502,13 @@
                     cogMarker = L.marker(
                         [firstPoint.lat, firstPoint.lon],
                         { icon: cogArrowIcon }
+                    ).addTo(map);
+
+                    // Create AWA arrow marker (orange)
+                    const awaArrowIcon = createAWAArrowIcon(firstPoint.aws, firstPoint.awa);
+                    awaMarker = L.marker(
+                        [firstPoint.lat, firstPoint.lon],
+                        { icon: awaArrowIcon }
                     ).addTo(map);
                 }
 
@@ -509,6 +602,11 @@
                 const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
                 cogMarker.setIcon(newCOGArrowIcon);
 
+                // Update AWA arrow position and icon (orange)
+                awaMarker.setLatLng([point.lat, point.lon]);
+                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa);
+                awaMarker.setIcon(newAWAArrowIcon);
+
                 // Pan map to center on current position if enabled
                 if (panEnabled) {
                     map.panTo([point.lat, point.lon]);
@@ -517,7 +615,7 @@
                 // Update info
                 const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
                 document.getElementById('progress-info').textContent =
-                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | COG: ${point.cog.toFixed(1)}° | SOG: ${point.sog.toFixed(2)} kt | RPM: ${point.rpm} | TWA: ${point.twa.toFixed(1)}° | TWS: ${point.tws.toFixed(1)}`;
+                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | RPM: ${point.rpm} | COG: ${point.cog.toFixed(1)}° SOG: ${point.sog.toFixed(2)}kt | TWA: ${point.twa.toFixed(1)}° TWS: ${point.tws.toFixed(1)}kt | AWA: ${point.awa.toFixed(1)}° AWS: ${point.aws.toFixed(2)}kt`;
 
                 currentIndex += direction;
             }, delay);
@@ -550,6 +648,7 @@
             if (allPoints.length > 0) {
                 windMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
                 cogMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
+                awaMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
             }
 
             document.getElementById('progress-info').textContent = 'Ready to play';

@@ -8,17 +8,23 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 - Track line style based on engine RPM:
   - **Solid line**: Sailing under wind power (RPM = 0)
   - **Dotted line**: Motoring with engine (RPM > 0)
-- Dual-arrow animation system showing both wind and boat movement:
-  - **Blue arrow**: Wind conditions
+- Triple-arrow animation system showing wind and boat movement:
+  - **Blue arrow**: True Wind conditions
     - Points away from True Wind Angle (TWA)
     - Length proportional to True Wind Speed (TWS)
-    - Shows wind direction and strength
+    - Shows true wind direction and strength
   - **Green arrow**: Boat movement
     - Points toward Course Over Ground (COG)
     - Length proportional to Speed Over Ground (SOG)
     - Shows actual boat direction and speed
+  - **Orange arrow**: Apparent Wind conditions
+    - Points away from Apparent Wind Angle (AWA)
+    - Length proportional to Apparent Wind Speed (AWS)
+    - Shows apparent wind as experienced on the boat
 - Shows start (green) and end (red) markers for each track
-- Arrow legend explaining wind and boat movement indicators
+- Interactive arrow legend with toggles:
+  - Checkboxes to show/hide each arrow type independently
+  - Explains the three arrow types (wind, boat, apparent wind)
 - Adjustable animation speed (1/8x to 8x)
 - Play, pause, and reset controls
 - Reverse animation to play backwards through the track
@@ -26,11 +32,10 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 - Displays real-time information during animation:
   - Date/Time (UTC)
   - Latitude and Longitude coordinates
-  - Course Over Ground (COG) in degrees
-  - Speed Over Ground (SOG) in knots
   - Engine RPM
-  - True Wind Angle (TWA) in degrees
-  - True Wind Speed (TWS)
+  - Course Over Ground (COG) and Speed Over Ground (SOG)
+  - True Wind Angle (TWA) and True Wind Speed (TWS)
+  - Apparent Wind Angle (AWA) and Apparent Wind Speed (AWS)
 - Automatically fits the map to show all tracks
 - Original track remains fully visible (no overlaying animation trail)
 
@@ -106,6 +111,8 @@ The application expects JSON files with the following structure:
     "rpm": "1327",
     "tws": "5.2",
     "twa": "-65.6",
+    "aws": "3.12",
+    "awa": "-66.88",
     "utc": "2024-08-21 11:26:00",
     "sog": "0.00",
     "cog": "35.8"
@@ -117,8 +124,10 @@ Required fields:
 - `lat`: Latitude coordinate
 - `lon`: Longitude coordinate
 - `rpm`: Engine RPM (0 = engine off, >0 = engine running)
-- `tws`: True wind speed (used for color coding and arrow length)
+- `tws`: True wind speed (used for arrow length)
 - `twa`: True wind angle in degrees (used for arrow rotation)
+- `aws`: Apparent wind speed (used for arrow length)
+- `awa`: Apparent wind angle in degrees (used for arrow rotation)
 
 Optional fields (displayed in info panel):
 - `utc`: Timestamp
