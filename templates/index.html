@@ -182,8 +182,9 @@
 
         <div class="right-sidebar">
             <div class="legend">
-                <div class="legend-title">Arrow Legend</div>
+                <div class="legend-title">Legend</div>
                 <div style="margin-top: 5px;">
+                    <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Arrows:</div>
                     <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
                         <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
                         <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
@@ -200,13 +201,27 @@
                         </svg>
                         <span style="font-size: 11px;">Boat (COG/SOG)</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 5px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
                         <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
                         <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
                             <line x1="3" y1="8" x2="20" y2="8" stroke="orange" stroke-width="3"/>
                             <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="orange"/>
                         </svg>
                         <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
+                    </div>
+
+                    <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Track Lines:</div>
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                        <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="3" y1="8" x2="37" y2="8" stroke="#007bff" stroke-width="3"/>
+                        </svg>
+                        <span style="font-size: 11px;">Sailing (RPM=0)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="3" y1="8" x2="37" y2="8" stroke="#007bff" stroke-width="3" stroke-dasharray="5,5"/>
+                        </svg>
+                        <span style="font-size: 11px;">Motoring (RPM>0)</span>
                     </div>
                 </div>
             </div>
