@@ -172,10 +172,80 @@
             font-style: italic;
             color: #666;
         }
+
+        .photo-marker {
+            font-size: 24px;
+            text-align: center;
+            cursor: pointer;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .photo-marker:hover {
+            transform: scale(1.2);
+        }
+
+        .photo-modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.9);
+            overflow: auto;
+        }
+
+        .photo-modal-content {
+            margin: auto;
+            display: block;
+            max-width: 90%;
+            max-height: 90%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .photo-modal-close {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 2001;
+        }
+
+        .photo-modal-close:hover,
+        .photo-modal-close:focus {
+            color: #bbb;
+        }
+
+        .photo-modal-info {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            text-align: center;
+            font-size: 14px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="loading" class="loading">Loading tracks...</div>
+
+    <!-- Photo Modal -->
+    <div id="photo-modal" class="photo-modal">
+        <span class="photo-modal-close" onclick="closePhotoModal()">&times;</span>
+        <img class="photo-modal-content" id="modal-image">
+        <div class="photo-modal-info" id="modal-info"></div>
+    </div>
 
     <div class="main-content">
         <div id="map"></div>
@@ -241,6 +311,17 @@
                     <div class="data-row"><span class="data-label">AWS:</span><span class="data-value" id="data-aws">--</span></div>
                 </div>
             </div>
+
+            <div class="photo-panel">
+                <div class="data-panel-title">Photos</div>
+                <div style="font-size: 11px;">
+                    <label for="photo-upload" style="display: block; margin-bottom: 8px; cursor: pointer; padding: 8px; background: #007bff; color: white; text-align: center; border-radius: 4px;">
+                        Select Photos
+                        <input type="file" id="photo-upload" multiple accept="image/*" style="display: none;">
+                    </label>
+                    <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos loaded</div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -265,6 +346,9 @@
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
+    <!-- EXIF.js for reading GPS data from photos -->
+    <script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
+
     <script>
         let map;
         let tracks = [];
@@ -283,6 +367,7 @@
         let showWindArrow = true;
         let showCogArrow = true;
         let showAwaArrow = true;
+        let photoMarkers = [];
 
         // Map slider values (1-7) to speed multipliers
         function getSpeedMultiplier(sliderValue) {
@@ -798,6 +883,125 @@
                 startAnimation();
             }
         });
+
+        // Convert GPS coordinates from EXIF format to decimal degrees
+        function convertDMSToDD(degrees, minutes, seconds, direction) {
+            let dd = degrees + minutes / 60 + seconds / 3600;
+            if (direction === 'S' || direction === 'W') {
+                dd = dd * -1;
+            }
+            return dd;
+        }
+
+        // Open photo modal with full resolution image
+        function openPhotoModal(imageSrc, fileName, dateTime) {
+            const modal = document.getElementById('photo-modal');
+            const modalImg = document.getElementById('modal-image');
+            const modalInfo = document.getElementById('modal-info');
+
+            modal.style.display = 'block';
+            modalImg.src = imageSrc;
+            modalInfo.innerHTML = `<div>${fileName}</div>${dateTime ? `<div style="font-size: 12px; margin-top: 5px;">${dateTime}</div>` : ''}`;
+        }
+
+        // Close photo modal
+        function closePhotoModal() {
+            document.getElementById('photo-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside the image
+        window.onclick = function(event) {
+            const modal = document.getElementById('photo-modal');
+            if (event.target === modal) {
+                closePhotoModal();
+            }
+        }
+
+        // Close modal with Escape key
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closePhotoModal();
+            }
+        });
+
+        // Handle photo upload and extract GPS data
+        function handlePhotoUpload(event) {
+            const files = event.target.files;
+            if (files.length === 0) return;
+
+            let photosWithGPS = 0;
+            let photosProcessed = 0;
+
+            // Clear existing photo markers
+            photoMarkers.forEach(marker => map.removeLayer(marker));
+            photoMarkers = [];
+
+            Array.from(files).forEach(file => {
+                if (!file.type.startsWith('image/')) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = new Image();
+                    img.src = e.target.result;
+
+                    img.onload = function() {
+                        EXIF.getData(img, function() {
+                            const lat = EXIF.getTag(this, 'GPSLatitude');
+                            const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+                            const lon = EXIF.getTag(this, 'GPSLongitude');
+                            const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
+                            const dateTime = EXIF.getTag(this, 'DateTime');
+
+                            photosProcessed++;
+
+                            if (lat && lon && latRef && lonRef) {
+                                const latitude = convertDMSToDD(lat[0], lat[1], lat[2], latRef);
+                                const longitude = convertDMSToDD(lon[0], lon[1], lon[2], lonRef);
+
+                                // Create camera icon for photo marker
+                                const photoIcon = L.divIcon({
+                                    html: '📷',
+                                    iconSize: [24, 24],
+                                    className: 'photo-marker',
+                                    iconAnchor: [12, 12]
+                                });
+
+                                // Add marker to map - clicking marker opens full-res photo
+                                const marker = L.marker([latitude, longitude], { icon: photoIcon })
+                                    .addTo(map)
+                                    .on('click', function() {
+                                        openPhotoModal(e.target.result, file.name, dateTime);
+                                    });
+
+                                // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
+                                const popupContent = `
+                                    <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}')">
+                                        <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
+                                        <div style="font-size: 11px; color: #666;">${file.name}</div>
+                                        ${dateTime ? `<div style="font-size: 10px; color: #999;">${dateTime}</div>` : ''}
+                                        <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
+                                    </div>
+                                `;
+                                marker.bindPopup(popupContent);
+
+                                photoMarkers.push(marker);
+                                photosWithGPS++;
+                            }
+
+                            // Update status after all photos processed
+                            if (photosProcessed === files.length) {
+                                document.getElementById('photo-status').textContent =
+                                    `Loaded ${photosWithGPS} of ${files.length} photos with GPS data`;
+                            }
+                        });
+                    };
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Add event listener for photo upload
+        document.getElementById('photo-upload').addEventListener('change', handlePhotoUpload);
 
         // Initialize on page load
         window.addEventListener('load', initMap);
