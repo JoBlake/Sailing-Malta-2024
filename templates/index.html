@@ -22,9 +22,25 @@
             flex-direction: column;
         }
 
+        .main-content {
+            flex: 1;
+            display: flex;
+            overflow: hidden;
+        }
+
         #map {
             flex: 1;
-            width: 100%;
+        }
+
+        .right-sidebar {
+            width: 280px;
+            background: white;
+            border-left: 2px solid #ddd;
+            overflow-y: auto;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
         }
 
         .controls {
@@ -67,8 +83,10 @@
         }
 
         .info {
-            font-size: 14px;
+            font-size: 12px;
             color: #333;
+            flex: 1;
+            min-width: 200px;
         }
 
         .wind-arrow {
@@ -94,18 +112,45 @@
         }
 
         .legend {
-            background: white;
-            padding: 10px;
-            border-radius: 5px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             font-size: 12px;
             line-height: 1.5;
         }
 
         .legend-title {
             font-weight: bold;
-            margin-bottom: 5px;
-            text-align: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+
+        .data-panel {
+            font-size: 11px;
+        }
+
+        .data-panel-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 14px;
+            border-bottom: 2px solid #28a745;
+            padding-bottom: 5px;
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .data-label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        .data-value {
+            color: #000;
+            font-family: monospace;
         }
 
         .legend-scale {
@@ -131,7 +176,58 @@
 </head>
 <body>
     <div id="loading" class="loading">Loading tracks...</div>
-    <div id="map"></div>
+
+    <div class="main-content">
+        <div id="map"></div>
+
+        <div class="right-sidebar">
+            <div class="legend">
+                <div class="legend-title">Arrow Legend</div>
+                <div style="margin-top: 5px;">
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                        <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
+                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="3" y1="8" x2="20" y2="8" stroke="blue" stroke-width="3"/>
+                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="blue"/>
+                        </svg>
+                        <span style="font-size: 11px;">True Wind (TWA/TWS)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                        <input type="checkbox" id="toggle-cog" checked style="cursor: pointer;">
+                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="3" y1="8" x2="20" y2="8" stroke="green" stroke-width="3"/>
+                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="green"/>
+                        </svg>
+                        <span style="font-size: 11px;">Boat (COG/SOG)</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 5px;">
+                        <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
+                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                            <line x1="3" y1="8" x2="20" y2="8" stroke="orange" stroke-width="3"/>
+                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="orange"/>
+                        </svg>
+                        <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="data-panel">
+                <div class="data-panel-title">Current Data</div>
+                <div id="data-display">
+                    <div class="data-row"><span class="data-label">Time:</span><span class="data-value" id="data-time">--</span></div>
+                    <div class="data-row"><span class="data-label">Latitude:</span><span class="data-value" id="data-lat">--</span></div>
+                    <div class="data-row"><span class="data-label">Longitude:</span><span class="data-value" id="data-lon">--</span></div>
+                    <div class="data-row"><span class="data-label">RPM:</span><span class="data-value" id="data-rpm">--</span></div>
+                    <div class="data-row"><span class="data-label">COG:</span><span class="data-value" id="data-cog">--</span></div>
+                    <div class="data-row"><span class="data-label">SOG:</span><span class="data-value" id="data-sog">--</span></div>
+                    <div class="data-row"><span class="data-label">TWA:</span><span class="data-value" id="data-twa">--</span></div>
+                    <div class="data-row"><span class="data-label">TWS:</span><span class="data-value" id="data-tws">--</span></div>
+                    <div class="data-row"><span class="data-label">AWA:</span><span class="data-value" id="data-awa">--</span></div>
+                    <div class="data-row"><span class="data-label">AWS:</span><span class="data-value" id="data-aws">--</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="controls">
         <button id="play-btn">Play</button>
@@ -207,17 +303,13 @@
         // cog: Course Over Ground (degrees) - boat's heading/direction
         // twsRange: {min, max} for normalization
         function createArrowIcon(tws, twa, cog, twsRange) {
-            // Calculate arrow length based on TWS (normalize to 40-80 pixels)
-            const minLength = 40;
+            // Calculate arrow length based on TWS with truly proportional scaling
+            // Use unified scale: 0-20 knots for consistency across all arrows
+            const minLength = 10; // Small minimum for visibility
             const maxLength = 80;
-            let length = minLength;
-
-            if (twsRange && twsRange.max > twsRange.min) {
-                const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
-                length = minLength + normalized * (maxLength - minLength);
-            } else if (tws > 0) {
-                length = 60; // Default if no range
-            }
+            const maxScale = 20; // Maximum knots for scaling
+            const normalized = Math.min(tws / maxScale, 1);
+            const length = minLength + normalized * (maxLength - minLength);
 
             const lineWidth = 4;
             const arrowheadWidth = 14;
@@ -252,11 +344,12 @@
         // cog: Course Over Ground (degrees)
         // sog: Speed Over Ground (knots)
         function createCOGArrowIcon(sog, cog) {
-            // Calculate arrow length based on SOG (normalize to 40-80 pixels)
-            const minLength = 40;
+            // Calculate arrow length based on SOG with truly proportional scaling
+            // Use unified scale: 0-20 knots for consistency across all arrows
+            const minLength = 10; // Small minimum for visibility
             const maxLength = 80;
-            // Assume SOG range 0-10 knots for scaling
-            const normalized = Math.min(sog / 10, 1);
+            const maxScale = 20; // Maximum knots for scaling
+            const normalized = Math.min(sog / maxScale, 1);
             const length = minLength + normalized * (maxLength - minLength);
 
             const lineWidth = 4;
@@ -290,11 +383,12 @@
         // awa: Apparent Wind Angle (degrees) - relative to boat heading
         // cog: Course Over Ground (degrees) - boat's heading/direction
         function createAWAArrowIcon(aws, awa, cog) {
-            // Calculate arrow length based on AWS (normalize to 40-80 pixels)
-            const minLength = 40;
+            // Calculate arrow length based on AWS with truly proportional scaling
+            // Use unified scale: 0-20 knots for consistency across all arrows
+            const minLength = 10; // Small minimum for visibility
             const maxLength = 80;
-            // Assume AWS range 0-15 knots for scaling
-            const normalized = Math.min(aws / 15, 1);
+            const maxScale = 20; // Maximum knots for scaling
+            const normalized = Math.min(aws / maxScale, 1);
             const length = minLength + normalized * (maxLength - minLength);
 
             const lineWidth = 4;
@@ -425,76 +519,33 @@
                     ]);
                 }
 
-                // Add legend for arrows with checkboxes
-                const legend = L.control({ position: 'bottomleft' });
-                legend.onAdd = function(map) {
-                    const div = L.DomUtil.create('div', 'legend');
-                    div.innerHTML = `
-                        <div class="legend-title">Arrow Legend</div>
-                        <div style="margin-top: 5px;">
-                            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
-                                <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
-                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="5" y1="10" x2="25" y2="10" stroke="blue" stroke-width="3"/>
-                                    <path d="M 25,10 L 20,7 L 22,10 L 20,13 Z" fill="blue" stroke="blue" stroke-width="1"/>
-                                </svg>
-                                <span style="font-size: 11px;">Wind (TWA/TWS)</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 3px;">
-                                <input type="checkbox" id="toggle-cog" checked style="cursor: pointer;">
-                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="5" y1="10" x2="21" y2="10" stroke="green" stroke-width="3"/>
-                                    <path d="M 28,10 L 21,7 L 21,13 Z" fill="green" stroke="green" stroke-width="1"/>
-                                </svg>
-                                <span style="font-size: 11px;">Boat (COG/SOG)</span>
-                            </div>
-                            <div style="display: flex; align-items: center; gap: 5px;">
-                                <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
-                                <svg width="35" height="20" xmlns="http://www.w3.org/2000/svg">
-                                    <line x1="5" y1="10" x2="21" y2="10" stroke="orange" stroke-width="3"/>
-                                    <path d="M 28,10 L 21,7 L 21,13 Z" fill="orange" stroke="orange" stroke-width="1"/>
-                                </svg>
-                                <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
-                            </div>
-                        </div>
-                    `;
-
-                    // Prevent clicks on the legend from propagating to the map
-                    L.DomEvent.disableClickPropagation(div);
-
-                    return div;
-                };
-                legend.addTo(map);
-
                 // Add event listeners for arrow toggles
-                setTimeout(() => {
-                    document.getElementById('toggle-wind').addEventListener('change', (e) => {
-                        showWindArrow = e.target.checked;
-                        if (showWindArrow) {
-                            windMarker.addTo(map);
-                        } else {
-                            map.removeLayer(windMarker);
-                        }
-                    });
+                document.getElementById('toggle-wind').addEventListener('change', (e) => {
+                    showWindArrow = e.target.checked;
+                    if (showWindArrow) {
+                        windMarker.addTo(map);
+                    } else {
+                        map.removeLayer(windMarker);
+                    }
+                });
 
-                    document.getElementById('toggle-cog').addEventListener('change', (e) => {
-                        showCogArrow = e.target.checked;
-                        if (showCogArrow) {
-                            cogMarker.addTo(map);
-                        } else {
-                            map.removeLayer(cogMarker);
-                        }
-                    });
+                document.getElementById('toggle-cog').addEventListener('change', (e) => {
+                    showCogArrow = e.target.checked;
+                    if (showCogArrow) {
+                        cogMarker.addTo(map);
+                    } else {
+                        map.removeLayer(cogMarker);
+                    }
+                });
 
-                    document.getElementById('toggle-awa').addEventListener('change', (e) => {
-                        showAwaArrow = e.target.checked;
-                        if (showAwaArrow) {
-                            awaMarker.addTo(map);
-                        } else {
-                            map.removeLayer(awaMarker);
-                        }
-                    });
-                }, 100);
+                document.getElementById('toggle-awa').addEventListener('change', (e) => {
+                    showAwaArrow = e.target.checked;
+                    if (showAwaArrow) {
+                        awaMarker.addTo(map);
+                    } else {
+                        map.removeLayer(awaMarker);
+                    }
+                });
 
                 // Create wind arrow marker (blue)
                 if (allPoints.length > 0) {
@@ -518,6 +569,18 @@
                         [firstPoint.lat, firstPoint.lon],
                         { icon: awaArrowIcon }
                     ).addTo(map);
+
+                    // Initialize data panel with first point
+                    document.getElementById('data-time').textContent = firstPoint.utc;
+                    document.getElementById('data-lat').textContent = firstPoint.lat.toFixed(6) + '°';
+                    document.getElementById('data-lon').textContent = firstPoint.lon.toFixed(6) + '°';
+                    document.getElementById('data-rpm').textContent = firstPoint.rpm;
+                    document.getElementById('data-cog').textContent = firstPoint.cog.toFixed(1) + '°';
+                    document.getElementById('data-sog').textContent = firstPoint.sog.toFixed(2) + ' kt';
+                    document.getElementById('data-twa').textContent = firstPoint.twa.toFixed(1) + '°';
+                    document.getElementById('data-tws').textContent = firstPoint.tws.toFixed(1) + ' kt';
+                    document.getElementById('data-awa').textContent = firstPoint.awa.toFixed(1) + '°';
+                    document.getElementById('data-aws').textContent = firstPoint.aws.toFixed(2) + ' kt';
                 }
 
                 // No animation polyline - boat marker only to preserve original track visibility
@@ -620,10 +683,21 @@
                     map.panTo([point.lat, point.lon]);
                 }
 
-                // Update info
-                const progress = ((currentIndex / allPoints.length) * 100).toFixed(1);
+                // Update info in bottom bar and right sidebar
                 document.getElementById('progress-info').textContent =
-                    `Time: ${point.utc} | Lat: ${point.lat.toFixed(6)} | Lon: ${point.lon.toFixed(6)} | RPM: ${point.rpm} | COG: ${point.cog.toFixed(1)}° SOG: ${point.sog.toFixed(2)}kt | TWA: ${point.twa.toFixed(1)}° TWS: ${point.tws.toFixed(1)}kt | AWA: ${point.awa.toFixed(1)}° AWS: ${point.aws.toFixed(2)}kt`;
+                    `Point ${currentIndex + 1} of ${allPoints.length} (${((currentIndex / allPoints.length) * 100).toFixed(1)}%)`;
+
+                // Update data panel in sidebar
+                document.getElementById('data-time').textContent = point.utc;
+                document.getElementById('data-lat').textContent = point.lat.toFixed(6) + '°';
+                document.getElementById('data-lon').textContent = point.lon.toFixed(6) + '°';
+                document.getElementById('data-rpm').textContent = point.rpm;
+                document.getElementById('data-cog').textContent = point.cog.toFixed(1) + '°';
+                document.getElementById('data-sog').textContent = point.sog.toFixed(2) + ' kt';
+                document.getElementById('data-twa').textContent = point.twa.toFixed(1) + '°';
+                document.getElementById('data-tws').textContent = point.tws.toFixed(1) + ' kt';
+                document.getElementById('data-awa').textContent = point.awa.toFixed(1) + '°';
+                document.getElementById('data-aws').textContent = point.aws.toFixed(2) + ' kt';
 
                 currentIndex += direction;
             }, delay);
