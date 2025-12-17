@@ -5,9 +5,9 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 ## Features
 
 - Displays multiple sailing tracks on an interactive OpenStreetMap
-- Track line style based on engine RPM:
-  - **Solid line**: Sailing under wind power (RPM = 0)
-  - **Dotted line**: Motoring with engine (RPM > 0)
+- Track line color based on engine RPM:
+  - **Blue line**: Sailing under wind power (RPM = 0)
+  - **Red line**: Motoring with engine (RPM > 0)
 - Triple-arrow animation system showing wind and boat movement:
   - **Blue arrow**: True Wind conditions
     - Points away from True Wind Angle (TWA)

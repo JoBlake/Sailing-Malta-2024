@@ -190,7 +190,7 @@
             z-index: 2000;
             left: 0;
             top: 0;
-            width: 100%;
+            right: 280px; /* Leave space for right sidebar */
             height: 100%;
             background-color: rgba(0,0,0,0.9);
             overflow: auto;
@@ -283,13 +283,13 @@
                     <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Track Lines:</div>
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
                         <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="37" y2="8" stroke="#007bff" stroke-width="3"/>
+                            <line x1="3" y1="8" x2="37" y2="8" stroke="blue" stroke-width="3"/>
                         </svg>
                         <span style="font-size: 11px;">Sailing (RPM=0)</span>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                         <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="37" y2="8" stroke="#007bff" stroke-width="3" stroke-dasharray="5,5"/>
+                            <line x1="3" y1="8" x2="37" y2="8" stroke="red" stroke-width="3"/>
                         </svg>
                         <span style="font-size: 11px;">Motoring (RPM>0)</span>
                     </div>
@@ -309,6 +309,15 @@
                     <div class="data-row"><span class="data-label">TWS:</span><span class="data-value" id="data-tws">--</span></div>
                     <div class="data-row"><span class="data-label">AWA:</span><span class="data-value" id="data-awa">--</span></div>
                     <div class="data-row"><span class="data-label">AWS:</span><span class="data-value" id="data-aws">--</span></div>
+                </div>
+            </div>
+
+            <div class="data-panel">
+                <div class="data-panel-title">Position Control</div>
+                <div style="font-size: 11px; padding: 5px 0;">
+                    <label for="position-slider" style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Track Position:</label>
+                    <input type="range" id="position-slider" min="0" max="100" value="0" style="width: 100%; cursor: pointer;">
+                    <div id="position-info" style="font-size: 10px; color: #666; margin-top: 5px; text-align: center;">Point 0 of 0</div>
                 </div>
             </div>
 
@@ -353,7 +362,6 @@
         let map;
         let tracks = [];
         let bounds = null;
-        let twsRange = null;
         let allPoints = [];
         let currentIndex = 0;
         let animationInterval = null;
@@ -368,6 +376,20 @@
         let showCogArrow = true;
         let showAwaArrow = true;
         let photoMarkers = [];
+
+        // Helper function to update data display
+        function updateDataDisplay(point) {
+            document.getElementById('data-time').textContent = point.utc;
+            document.getElementById('data-lat').textContent = point.lat.toFixed(6) + '°';
+            document.getElementById('data-lon').textContent = point.lon.toFixed(6) + '°';
+            document.getElementById('data-rpm').textContent = point.rpm;
+            document.getElementById('data-cog').textContent = point.cog.toFixed(1) + '°';
+            document.getElementById('data-sog').textContent = point.sog.toFixed(2) + ' kt';
+            document.getElementById('data-twa').textContent = point.twa.toFixed(1) + '°';
+            document.getElementById('data-tws').textContent = point.tws.toFixed(1) + ' kt';
+            document.getElementById('data-awa').textContent = point.awa.toFixed(1) + '°';
+            document.getElementById('data-aws').textContent = point.aws.toFixed(2) + ' kt';
+        }
 
         // Map slider values (1-7) to speed multipliers
         function getSpeedMultiplier(sliderValue) {
@@ -401,8 +423,7 @@
         // tws: True Wind Speed
         // twa: True Wind Angle (degrees) - relative to boat heading
         // cog: Course Over Ground (degrees) - boat's heading/direction
-        // twsRange: {min, max} for normalization
-        function createArrowIcon(tws, twa, cog, twsRange) {
+        function createArrowIcon(tws, twa, cog) {
             // Calculate arrow length based on TWS with truly proportional scaling
             // Use unified scale: 0-20 knots for consistency across all arrows
             const minLength = 10; // Small minimum for visibility
@@ -528,7 +549,6 @@
                 const data = await response.json();
                 tracks = data.tracks;
                 bounds = data.bounds;
-                twsRange = data.tws_range;
 
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
@@ -550,26 +570,25 @@
 
                 // Draw all tracks on the map with line style based on RPM
                 tracks.forEach((track, index) => {
-                    // Draw segments: solid when rpm=0 (sailing), dotted when rpm>0 (motoring)
+                    // Draw segments: blue when rpm=0 (sailing), red when rpm>0 (motoring)
                     for (let i = 0; i < track.points.length - 1; i++) {
                         const p1 = track.points[i];
                         const p2 = track.points[i + 1];
 
-                        // Determine line style based on RPM
-                        let dashArray;
+                        // Determine color based on RPM
+                        let segmentColor;
                         if (p1.rpm === 0 && p2.rpm === 0) {
-                            dashArray = null; // Solid line for sailing
+                            segmentColor = 'blue'; // Blue for sailing
                         } else {
-                            dashArray = '5, 10'; // Dotted line for motoring
+                            segmentColor = 'red'; // Red for motoring
                         }
 
                         const segment = L.polyline(
                             [[p1.lat, p1.lon], [p2.lat, p2.lon]],
                             {
-                                color: 'blue',
-                                weight: 3,
-                                opacity: 0.7,
-                                dashArray: dashArray
+                                color: segmentColor,
+                                weight: 2,
+                                opacity: 0.7
                             }
                         ).addTo(map);
                         trackPolylines.push(segment);
@@ -650,7 +669,7 @@
                 // Create wind arrow marker (blue)
                 if (allPoints.length > 0) {
                     const firstPoint = allPoints[0];
-                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, firstPoint.cog, twsRange);
+                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, firstPoint.cog);
                     windMarker = L.marker(
                         [firstPoint.lat, firstPoint.lon],
                         { icon: windArrowIcon }
@@ -671,17 +690,48 @@
                     ).addTo(map);
 
                     // Initialize data panel with first point
-                    document.getElementById('data-time').textContent = firstPoint.utc;
-                    document.getElementById('data-lat').textContent = firstPoint.lat.toFixed(6) + '°';
-                    document.getElementById('data-lon').textContent = firstPoint.lon.toFixed(6) + '°';
-                    document.getElementById('data-rpm').textContent = firstPoint.rpm;
-                    document.getElementById('data-cog').textContent = firstPoint.cog.toFixed(1) + '°';
-                    document.getElementById('data-sog').textContent = firstPoint.sog.toFixed(2) + ' kt';
-                    document.getElementById('data-twa').textContent = firstPoint.twa.toFixed(1) + '°';
-                    document.getElementById('data-tws').textContent = firstPoint.tws.toFixed(1) + ' kt';
-                    document.getElementById('data-awa').textContent = firstPoint.awa.toFixed(1) + '°';
-                    document.getElementById('data-aws').textContent = firstPoint.aws.toFixed(2) + ' kt';
+                    updateDataDisplay(firstPoint);
+
+                    // Initialize position slider
+                    const positionSlider = document.getElementById('position-slider');
+                    positionSlider.max = allPoints.length - 1;
+                    positionSlider.value = 0;
+                    document.getElementById('position-info').textContent = `${firstPoint.utc} (1/${allPoints.length})`;
                 }
+
+                // Add position slider event listener
+                document.getElementById('position-slider').addEventListener('input', (e) => {
+                    const newIndex = parseInt(e.target.value);
+                    currentIndex = newIndex;
+
+                    if (allPoints.length > 0) {
+                        const point = allPoints[currentIndex];
+
+                        // Update arrows
+                        windMarker.setLatLng([point.lat, point.lon]);
+                        const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
+                        windMarker.setIcon(newWindArrowIcon);
+
+                        cogMarker.setLatLng([point.lat, point.lon]);
+                        const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
+                        cogMarker.setIcon(newCOGArrowIcon);
+
+                        awaMarker.setLatLng([point.lat, point.lon]);
+                        const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
+                        awaMarker.setIcon(newAWAArrowIcon);
+
+                        // Pan if enabled
+                        if (panEnabled) {
+                            map.panTo([point.lat, point.lon]);
+                        }
+
+                        // Update data display
+                        updateDataDisplay(point);
+
+                        // Update position info with timestamp
+                        document.getElementById('position-info').textContent = `${point.utc} (${currentIndex + 1}/${allPoints.length})`;
+                    }
+                });
 
                 // No animation polyline - boat marker only to preserve original track visibility
 
@@ -691,54 +741,6 @@
             }
         }
 
-        // CMRmap colormap (Color Map for Remote sensing)
-        // Maps a value from 0-1 to a color: Black -> Red -> Magenta -> Blue -> White
-        function getColorFromValue(value) {
-            // Clamp value between 0 and 1
-            value = Math.max(0, Math.min(1, value));
-
-            // CMRmap: Black -> Red -> Magenta -> Blue -> White
-            if (value < 0.25) {
-                // Black to Red
-                const t = value / 0.25;
-                const r = Math.floor(t * 255);
-                const g = 0;
-                const b = 0;
-                return `rgb(${r}, ${g}, ${b})`;
-            } else if (value < 0.5) {
-                // Red to Magenta
-                const t = (value - 0.25) / 0.25;
-                const r = 255;
-                const g = 0;
-                const b = Math.floor(t * 255);
-                return `rgb(${r}, ${g}, ${b})`;
-            } else if (value < 0.75) {
-                // Magenta to Blue
-                const t = (value - 0.5) / 0.25;
-                const r = Math.floor(255 * (1 - t));
-                const g = 0;
-                const b = 255;
-                return `rgb(${r}, ${g}, ${b})`;
-            } else {
-                // Blue to White
-                const t = (value - 0.75) / 0.25;
-                const r = Math.floor(t * 255);
-                const g = Math.floor(t * 255);
-                const b = 255;
-                return `rgb(${r}, ${g}, ${b})`;
-            }
-        }
-
-        // Get color based on tws value
-        function getTwsColor(tws) {
-            if (!twsRange || twsRange.min === twsRange.max) {
-                return 'black';
-            }
-
-            // Normalize tws to 0-1 range
-            const normalized = (tws - twsRange.min) / (twsRange.max - twsRange.min);
-            return getColorFromValue(normalized);
-        }
 
         // Animation functions
         function startAnimation() {
@@ -765,7 +767,7 @@
 
                 // Update wind arrow position and icon (blue)
                 windMarker.setLatLng([point.lat, point.lon]);
-                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog, twsRange);
+                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
                 windMarker.setIcon(newWindArrowIcon);
 
                 // Update COG arrow position and icon (green)
@@ -788,16 +790,11 @@
                     `Point ${currentIndex + 1} of ${allPoints.length} (${((currentIndex / allPoints.length) * 100).toFixed(1)}%)`;
 
                 // Update data panel in sidebar
-                document.getElementById('data-time').textContent = point.utc;
-                document.getElementById('data-lat').textContent = point.lat.toFixed(6) + '°';
-                document.getElementById('data-lon').textContent = point.lon.toFixed(6) + '°';
-                document.getElementById('data-rpm').textContent = point.rpm;
-                document.getElementById('data-cog').textContent = point.cog.toFixed(1) + '°';
-                document.getElementById('data-sog').textContent = point.sog.toFixed(2) + ' kt';
-                document.getElementById('data-twa').textContent = point.twa.toFixed(1) + '°';
-                document.getElementById('data-tws').textContent = point.tws.toFixed(1) + ' kt';
-                document.getElementById('data-awa').textContent = point.awa.toFixed(1) + '°';
-                document.getElementById('data-aws').textContent = point.aws.toFixed(2) + ' kt';
+                updateDataDisplay(point);
+
+                // Update position slider
+                document.getElementById('position-slider').value = currentIndex;
+                document.getElementById('position-info').textContent = `${point.utc} (${currentIndex + 1}/${allPoints.length})`;
 
                 currentIndex += direction;
             }, delay);
@@ -828,9 +825,20 @@
             reverseBtn.textContent = 'Reverse';
 
             if (allPoints.length > 0) {
-                windMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
-                cogMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
-                awaMarker.setLatLng([allPoints[0].lat, allPoints[0].lon]);
+                const firstPoint = allPoints[0];
+                windMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                cogMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                awaMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+
+                // Center map at start position
+                map.panTo([firstPoint.lat, firstPoint.lon]);
+
+                // Update data display
+                updateDataDisplay(firstPoint);
+
+                // Update position slider
+                document.getElementById('position-slider').value = 0;
+                document.getElementById('position-info').textContent = `${firstPoint.utc} (1/${allPoints.length})`;
             }
 
             document.getElementById('progress-info').textContent = 'Ready to play';
@@ -893,6 +901,14 @@
             return dd;
         }
 
+        // Format EXIF date to yyyy-mm-dd
+        function formatExifDate(exifDate) {
+            if (!exifDate) return '';
+            // EXIF format is "YYYY:MM:DD HH:MM:SS"
+            // Convert to "YYYY-MM-DD"
+            return exifDate.substring(0, 10).replace(/:/g, '-');
+        }
+
         // Open photo modal with full resolution image
         function openPhotoModal(imageSrc, fileName, dateTime) {
             const modal = document.getElementById('photo-modal');
@@ -901,7 +917,8 @@
 
             modal.style.display = 'block';
             modalImg.src = imageSrc;
-            modalInfo.innerHTML = `<div>${fileName}</div>${dateTime ? `<div style="font-size: 12px; margin-top: 5px;">${dateTime}</div>` : ''}`;
+            const formattedDate = formatExifDate(dateTime);
+            modalInfo.innerHTML = `<div>${fileName}</div>${formattedDate ? `<div style="font-size: 12px; margin-top: 5px;">${formattedDate}</div>` : ''}`;
         }
 
         // Close photo modal
@@ -974,11 +991,12 @@
                                     });
 
                                 // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
+                                const formattedDate = formatExifDate(dateTime);
                                 const popupContent = `
                                     <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}')">
                                         <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
                                         <div style="font-size: 11px; color: #666;">${file.name}</div>
-                                        ${dateTime ? `<div style="font-size: 10px; color: #999;">${dateTime}</div>` : ''}
+                                        ${formattedDate ? `<div style="font-size: 10px; color: #999;">${formattedDate}</div>` : ''}
                                         <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
                                     </div>
                                 `;
