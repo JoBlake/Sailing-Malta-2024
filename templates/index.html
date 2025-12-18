@@ -37,7 +37,48 @@
             background: white;
             border-left: 2px solid #ddd;
             overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 2px solid #ddd;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 12px;
+            background: #f5f5f5;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab-button:hover {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .tab-button.active {
+            background: white;
+            color: #007bff;
+            border-bottom-color: #007bff;
+        }
+
+        .tab-content {
+            display: none;
             padding: 15px;
+            flex: 1;
+            overflow-y: auto;
+        }
+
+        .tab-content.active {
             display: flex;
             flex-direction: column;
             gap: 20px;
@@ -235,6 +276,102 @@
             padding: 10px 20px;
             border-radius: 5px;
         }
+
+        .annotation-marker {
+            font-size: 24px;
+            text-align: center;
+            cursor: pointer;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .annotation-marker:hover {
+            transform: scale(1.2);
+        }
+
+        .annotation-form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .annotation-form textarea {
+            width: 100%;
+            min-height: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: Arial, sans-serif;
+            resize: vertical;
+        }
+
+        .annotation-form button {
+            padding: 8px 16px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .annotation-form button:hover {
+            background: #218838;
+        }
+
+        .annotation-list {
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 11px;
+        }
+
+        .annotation-item {
+            padding: 8px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border-left: 3px solid #007bff;
+            cursor: pointer;
+        }
+
+        .annotation-item:hover {
+            background: #e9ecef;
+        }
+
+        .annotation-item-time {
+            font-size: 10px;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .annotation-item-text {
+            color: #333;
+        }
+
+        .distance-display {
+            background: #e7f3ff;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .distance-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+        }
+
+        .distance-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 11px;
+        }
+
+        .distance-value {
+            color: #007bff;
+            font-family: monospace;
+            font-weight: bold;
+            font-size: 11px;
+        }
     </style>
 </head>
 <body>
@@ -251,84 +388,146 @@
         <div id="map"></div>
 
         <div class="right-sidebar">
-            <div class="legend">
-                <div class="legend-title">Legend</div>
-                <div style="margin-top: 5px;">
-                    <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Arrows:</div>
-                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
-                        <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
-                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="20" y2="8" stroke="blue" stroke-width="3"/>
-                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="blue"/>
-                        </svg>
-                        <span style="font-size: 11px;">True Wind (TWA/TWS)</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
-                        <input type="checkbox" id="toggle-cog" checked style="cursor: pointer;">
-                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="20" y2="8" stroke="green" stroke-width="3"/>
-                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="green"/>
-                        </svg>
-                        <span style="font-size: 11px;">Boat (COG/SOG)</span>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
-                        <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
-                        <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="20" y2="8" stroke="orange" stroke-width="3"/>
-                            <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="orange"/>
-                        </svg>
-                        <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
-                    </div>
+            <!-- Tab buttons -->
+            <div class="tabs">
+                <button class="tab-button active" onclick="switchTab('home')">Home</button>
+                <button class="tab-button" onclick="switchTab('photo')">Photo</button>
+                <button class="tab-button" onclick="switchTab('annotation')">Annotation</button>
+            </div>
 
-                    <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Track Lines:</div>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                        <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="37" y2="8" stroke="blue" stroke-width="3"/>
-                        </svg>
-                        <span style="font-size: 11px;">Sailing (RPM=0)</span>
+            <!-- Home Tab -->
+            <div id="home-tab" class="tab-content active">
+                <div class="legend">
+                    <div class="legend-title">Legend</div>
+                    <div style="margin-top: 5px;">
+                        <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Arrows:</div>
+                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                            <input type="checkbox" id="toggle-wind" checked style="cursor: pointer;">
+                            <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                                <line x1="3" y1="8" x2="20" y2="8" stroke="blue" stroke-width="3"/>
+                                <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="blue"/>
+                            </svg>
+                            <span style="font-size: 11px;">True Wind (TWA/TWS)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 8px;">
+                            <input type="checkbox" id="toggle-cog" checked style="cursor: pointer;">
+                            <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                                <line x1="3" y1="8" x2="20" y2="8" stroke="green" stroke-width="3"/>
+                                <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="green"/>
+                            </svg>
+                            <span style="font-size: 11px;">Boat (COG/SOG)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 15px;">
+                            <input type="checkbox" id="toggle-awa" checked style="cursor: pointer;">
+                            <svg width="30" height="16" xmlns="http://www.w3.org/2000/svg">
+                                <line x1="3" y1="8" x2="20" y2="8" stroke="orange" stroke-width="3"/>
+                                <path d="M 20,8 L 15,5 L 17,8 L 15,11 Z" fill="orange"/>
+                            </svg>
+                            <span style="font-size: 11px;">Apparent Wind (AWA/AWS)</span>
+                        </div>
+
+                        <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; color: #555;">Track Lines:</div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                            <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
+                                <line x1="3" y1="8" x2="37" y2="8" stroke="blue" stroke-width="3"/>
+                            </svg>
+                            <span style="font-size: 11px;">Sailing (RPM=0)</span>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                            <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
+                                <line x1="3" y1="8" x2="37" y2="8" stroke="red" stroke-width="3"/>
+                            </svg>
+                            <span style="font-size: 11px;">Motoring (RPM>0)</span>
+                        </div>
                     </div>
-                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
-                        <svg width="40" height="16" xmlns="http://www.w3.org/2000/svg">
-                            <line x1="3" y1="8" x2="37" y2="8" stroke="red" stroke-width="3"/>
-                        </svg>
-                        <span style="font-size: 11px;">Motoring (RPM>0)</span>
+                </div>
+
+                <div class="distance-display">
+                    <div style="font-weight: bold; margin-bottom: 8px; font-size: 12px; color: #007bff;">Distance Travelled</div>
+                    <div class="distance-row">
+                        <span class="distance-label">Nautical Miles:</span>
+                        <span class="distance-value" id="distance-nm">0.00 nm</span>
+                    </div>
+                    <div class="distance-row">
+                        <span class="distance-label">Kilometers:</span>
+                        <span class="distance-value" id="distance-km">0.00 km</span>
+                    </div>
+                </div>
+
+                <div class="data-panel">
+                    <div class="data-panel-title">Current Data</div>
+                    <div id="data-display">
+                        <div class="data-row"><span class="data-label">Time:</span><span class="data-value" id="data-time">--</span></div>
+                        <div class="data-row"><span class="data-label">Latitude:</span><span class="data-value" id="data-lat">--</span></div>
+                        <div class="data-row"><span class="data-label">Longitude:</span><span class="data-value" id="data-lon">--</span></div>
+                        <div class="data-row"><span class="data-label">RPM:</span><span class="data-value" id="data-rpm">--</span></div>
+                        <div class="data-row"><span class="data-label">COG:</span><span class="data-value" id="data-cog">--</span></div>
+                        <div class="data-row"><span class="data-label">SOG:</span><span class="data-value" id="data-sog">--</span></div>
+                        <div class="data-row"><span class="data-label">TWA:</span><span class="data-value" id="data-twa">--</span></div>
+                        <div class="data-row"><span class="data-label">TWS:</span><span class="data-value" id="data-tws">--</span></div>
+                        <div class="data-row"><span class="data-label">AWA:</span><span class="data-value" id="data-awa">--</span></div>
+                        <div class="data-row"><span class="data-label">AWS:</span><span class="data-value" id="data-aws">--</span></div>
+                    </div>
+                </div>
+
+                <div class="data-panel">
+                    <div class="data-panel-title">Position Control</div>
+                    <div style="font-size: 11px; padding: 5px 0;">
+                        <label for="position-slider" style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Track Position:</label>
+                        <input type="range" id="position-slider" min="0" max="100" value="0" style="width: 100%; cursor: pointer;">
+                        <div id="position-info" style="font-size: 10px; color: #666; margin-top: 5px; text-align: center;">Point 0 of 0</div>
                     </div>
                 </div>
             </div>
 
-            <div class="data-panel">
-                <div class="data-panel-title">Current Data</div>
-                <div id="data-display">
-                    <div class="data-row"><span class="data-label">Time:</span><span class="data-value" id="data-time">--</span></div>
-                    <div class="data-row"><span class="data-label">Latitude:</span><span class="data-value" id="data-lat">--</span></div>
-                    <div class="data-row"><span class="data-label">Longitude:</span><span class="data-value" id="data-lon">--</span></div>
-                    <div class="data-row"><span class="data-label">RPM:</span><span class="data-value" id="data-rpm">--</span></div>
-                    <div class="data-row"><span class="data-label">COG:</span><span class="data-value" id="data-cog">--</span></div>
-                    <div class="data-row"><span class="data-label">SOG:</span><span class="data-value" id="data-sog">--</span></div>
-                    <div class="data-row"><span class="data-label">TWA:</span><span class="data-value" id="data-twa">--</span></div>
-                    <div class="data-row"><span class="data-label">TWS:</span><span class="data-value" id="data-tws">--</span></div>
-                    <div class="data-row"><span class="data-label">AWA:</span><span class="data-value" id="data-awa">--</span></div>
-                    <div class="data-row"><span class="data-label">AWS:</span><span class="data-value" id="data-aws">--</span></div>
+            <!-- Photo Tab -->
+            <div id="photo-tab" class="tab-content">
+                <div class="photo-panel">
+                    <div class="data-panel-title">Photo Gallery</div>
+                    <div style="font-size: 11px;">
+                        <label for="photo-upload" style="display: block; margin-bottom: 8px; cursor: pointer; padding: 8px; background: #007bff; color: white; text-align: center; border-radius: 4px;">
+                            Select Photos
+                            <input type="file" id="photo-upload" multiple accept="image/*" style="display: none;">
+                        </label>
+                        <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos loaded</div>
+                        <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 10px; color: #666;">
+                            <strong>Instructions:</strong> Select photos with GPS metadata. They will appear as camera icons on the map at their GPS coordinates. Click on the icons to view full-size photos.
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            <div class="data-panel">
-                <div class="data-panel-title">Position Control</div>
-                <div style="font-size: 11px; padding: 5px 0;">
-                    <label for="position-slider" style="display: block; margin-bottom: 5px; font-weight: 600; color: #555;">Track Position:</label>
-                    <input type="range" id="position-slider" min="0" max="100" value="0" style="width: 100%; cursor: pointer;">
-                    <div id="position-info" style="font-size: 10px; color: #666; margin-top: 5px; text-align: center;">Point 0 of 0</div>
+            <!-- Annotation Tab -->
+            <div id="annotation-tab" class="tab-content">
+                <div class="annotation-panel">
+                    <div class="data-panel-title">Add Annotation</div>
+                    <div class="annotation-form">
+                        <textarea id="annotation-text" placeholder="Enter annotation text for current position..."></textarea>
+                        <button onclick="addAnnotation()">Add Annotation</button>
+                    </div>
+                    <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 10px; color: #666;">
+                        Annotations are added at the current track position. Use the position slider in the Home tab to select where to add an annotation.
+                    </div>
                 </div>
-            </div>
 
-            <div class="photo-panel">
-                <div class="data-panel-title">Photos</div>
-                <div style="font-size: 11px;">
-                    <label for="photo-upload" style="display: block; margin-bottom: 8px; cursor: pointer; padding: 8px; background: #007bff; color: white; text-align: center; border-radius: 4px;">
-                        Select Photos
-                        <input type="file" id="photo-upload" multiple accept="image/*" style="display: none;">
-                    </label>
-                    <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos loaded</div>
+                <div style="margin-top: 20px;">
+                    <div class="data-panel-title">Manage Annotations</div>
+                    <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+                        <button onclick="saveAnnotations()" style="flex: 1; padding: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            Save Annotations
+                        </button>
+                        <label for="annotation-file-input" style="flex: 1; padding: 8px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; text-align: center;">
+                            Load Annotations
+                            <input type="file" id="annotation-file-input" accept=".json" style="display: none;" onchange="loadAnnotations(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <div class="data-panel-title">Annotations List</div>
+                    <div id="annotations-list" class="annotation-list">
+                        <div style="font-size: 11px; color: #999; text-align: center; padding: 20px;">No annotations yet</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -376,6 +575,263 @@
         let showCogArrow = true;
         let showAwaArrow = true;
         let photoMarkers = [];
+        let annotations = [];
+        let annotationMarkers = [];
+        let totalDistanceNM = 0;
+        let totalDistanceKM = 0;
+
+        // Tab switching function
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        // Helper function to calculate distance between two lat/lon points (Haversine formula)
+        // Returns distance in nautical miles
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 3440.065; // Earth's radius in nautical miles
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        // Calculate distance from start to current position
+        function calculateDistanceToCurrentPosition() {
+            let distanceNM = 0;
+            // Calculate distance from start (index 0) to current position
+            for (let i = 1; i <= currentIndex && i < allPoints.length; i++) {
+                const p1 = allPoints[i - 1];
+                const p2 = allPoints[i];
+                distanceNM += calculateDistance(p1.lat, p1.lon, p2.lat, p2.lon);
+            }
+            totalDistanceNM = distanceNM;
+            totalDistanceKM = distanceNM * 1.852; // Convert to kilometers
+            updateDistanceDisplay();
+        }
+
+        // Update distance display
+        function updateDistanceDisplay() {
+            document.getElementById('distance-nm').textContent = totalDistanceNM.toFixed(2) + ' nm';
+            document.getElementById('distance-km').textContent = totalDistanceKM.toFixed(2) + ' km';
+        }
+
+        // Add annotation at current position
+        function addAnnotation() {
+            const text = document.getElementById('annotation-text').value.trim();
+            if (!text) {
+                alert('Please enter annotation text');
+                return;
+            }
+
+            if (allPoints.length === 0 || currentIndex >= allPoints.length) {
+                alert('No track position available');
+                return;
+            }
+
+            const point = allPoints[currentIndex];
+            const annotation = {
+                text: text,
+                lat: point.lat,
+                lon: point.lon,
+                timestamp: point.utc,
+                index: currentIndex
+            };
+
+            annotations.push(annotation);
+
+            // Add marker to map
+            const annotationIcon = L.divIcon({
+                html: '📝',
+                iconSize: [24, 24],
+                className: 'annotation-marker',
+                iconAnchor: [12, 12]
+            });
+
+            const marker = L.marker([point.lat, point.lon], { icon: annotationIcon })
+                .addTo(map)
+                .on('click', function() {
+                    showAnnotationPopup(annotation);
+                });
+
+            annotationMarkers.push(marker);
+
+            // Clear textarea
+            document.getElementById('annotation-text').value = '';
+
+            // Update annotations list
+            updateAnnotationsList();
+
+            // Show success message
+            alert('Annotation added successfully!');
+        }
+
+        // Show annotation popup
+        function showAnnotationPopup(annotation) {
+            const popup = L.popup()
+                .setLatLng([annotation.lat, annotation.lon])
+                .setContent(`
+                    <div style="max-width: 200px;">
+                        <div style="font-weight: bold; margin-bottom: 5px;">Annotation</div>
+                        <div style="margin-bottom: 8px; white-space: pre-wrap;">${annotation.text}</div>
+                        <div style="font-size: 10px; color: #666; border-top: 1px solid #ddd; padding-top: 5px;">
+                            ${annotation.timestamp}
+                        </div>
+                    </div>
+                `)
+                .openOn(map);
+        }
+
+        // Update annotations list in UI
+        function updateAnnotationsList() {
+            const listContainer = document.getElementById('annotations-list');
+
+            if (annotations.length === 0) {
+                listContainer.innerHTML = '<div style="font-size: 11px; color: #999; text-align: center; padding: 20px;">No annotations yet</div>';
+                return;
+            }
+
+            listContainer.innerHTML = annotations.map((annotation, index) => `
+                <div class="annotation-item" onclick="jumpToAnnotation(${index})">
+                    <div class="annotation-item-time">${annotation.timestamp}</div>
+                    <div class="annotation-item-text">${annotation.text}</div>
+                </div>
+            `).join('');
+        }
+
+        // Jump to annotation position
+        function jumpToAnnotation(index) {
+            const annotation = annotations[index];
+
+            // Pan map to annotation
+            map.setView([annotation.lat, annotation.lon], map.getZoom());
+
+            // Update current index and position
+            currentIndex = annotation.index;
+
+            // Update arrows and data display
+            if (allPoints.length > 0 && currentIndex < allPoints.length) {
+                const point = allPoints[currentIndex];
+
+                windMarker.setLatLng([point.lat, point.lon]);
+                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
+                windMarker.setIcon(newWindArrowIcon);
+
+                cogMarker.setLatLng([point.lat, point.lon]);
+                const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
+                cogMarker.setIcon(newCOGArrowIcon);
+
+                awaMarker.setLatLng([point.lat, point.lon]);
+                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
+                awaMarker.setIcon(newAWAArrowIcon);
+
+                updateDataDisplay(point);
+
+                // Update distance from start to current position
+                calculateDistanceToCurrentPosition();
+
+                document.getElementById('position-slider').value = currentIndex;
+                document.getElementById('position-info').textContent = `${point.utc} (${currentIndex + 1}/${allPoints.length})`;
+            }
+
+            // Show popup
+            showAnnotationPopup(annotation);
+        }
+
+        // Save annotations to JSON file
+        function saveAnnotations() {
+            if (annotations.length === 0) {
+                alert('No annotations to save');
+                return;
+            }
+
+            // Create JSON data
+            const jsonData = JSON.stringify(annotations, null, 2);
+
+            // Create blob and download
+            const blob = new Blob([jsonData], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sailing-annotations.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            alert(`Saved ${annotations.length} annotation(s) to sailing-annotations.json`);
+        }
+
+        // Load annotations from JSON file
+        function loadAnnotations(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedAnnotations = JSON.parse(e.target.result);
+
+                    if (!Array.isArray(loadedAnnotations)) {
+                        alert('Invalid annotation file format');
+                        return;
+                    }
+
+                    // Clear existing annotations
+                    annotationMarkers.forEach(marker => map.removeLayer(marker));
+                    annotationMarkers = [];
+                    annotations = [];
+
+                    // Load new annotations
+                    loadedAnnotations.forEach(annotation => {
+                        // Validate annotation structure
+                        if (annotation.text && annotation.lat && annotation.lon && annotation.timestamp !== undefined && annotation.index !== undefined) {
+                            annotations.push(annotation);
+
+                            // Add marker to map
+                            const annotationIcon = L.divIcon({
+                                html: '📝',
+                                iconSize: [24, 24],
+                                className: 'annotation-marker',
+                                iconAnchor: [12, 12]
+                            });
+
+                            const marker = L.marker([annotation.lat, annotation.lon], { icon: annotationIcon })
+                                .addTo(map)
+                                .on('click', function() {
+                                    showAnnotationPopup(annotation);
+                                });
+
+                            annotationMarkers.push(marker);
+                        }
+                    });
+
+                    // Update annotations list
+                    updateAnnotationsList();
+
+                    alert(`Loaded ${annotations.length} annotation(s)`);
+
+                    // Reset file input
+                    event.target.value = '';
+
+                } catch (error) {
+                    alert('Error loading annotations: ' + error.message);
+                }
+            };
+            reader.readAsText(file);
+        }
 
         // Helper function to update data display
         function updateDataDisplay(point) {
@@ -630,6 +1086,9 @@
                     return new Date(a.utc) - new Date(b.utc);
                 });
 
+                // Calculate initial distance (at start position)
+                calculateDistanceToCurrentPosition();
+
                 // Fit map to bounds
                 if (bounds) {
                     map.fitBounds([
@@ -728,6 +1187,9 @@
                         // Update data display
                         updateDataDisplay(point);
 
+                        // Update distance from start to current position
+                        calculateDistanceToCurrentPosition();
+
                         // Update position info with timestamp
                         document.getElementById('position-info').textContent = `${point.utc} (${currentIndex + 1}/${allPoints.length})`;
                     }
@@ -792,6 +1254,9 @@
                 // Update data panel in sidebar
                 updateDataDisplay(point);
 
+                // Update distance from start to current position
+                calculateDistanceToCurrentPosition();
+
                 // Update position slider
                 document.getElementById('position-slider').value = currentIndex;
                 document.getElementById('position-info').textContent = `${point.utc} (${currentIndex + 1}/${allPoints.length})`;
@@ -835,6 +1300,9 @@
 
                 // Update data display
                 updateDataDisplay(firstPoint);
+
+                // Update distance (should be 0 at start)
+                calculateDistanceToCurrentPosition();
 
                 // Update position slider
                 document.getElementById('position-slider').value = 0;
@@ -901,12 +1369,12 @@
             return dd;
         }
 
-        // Format EXIF date to yyyy-mm-dd
+        // Format EXIF date to yyyy-mm-dd HH:MM:SS
         function formatExifDate(exifDate) {
             if (!exifDate) return '';
             // EXIF format is "YYYY:MM:DD HH:MM:SS"
-            // Convert to "YYYY-MM-DD"
-            return exifDate.substring(0, 10).replace(/:/g, '-');
+            // Convert to "YYYY-MM-DD HH:MM:SS"
+            return exifDate.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
         }
 
         // Open photo modal with full resolution image
