@@ -4,7 +4,10 @@
       "Bash(mkdir:*)",
       "Bash(timeout 5 uv run:*)",
       "Bash(curl:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(uv sync)",
+      "Bash(uv run:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

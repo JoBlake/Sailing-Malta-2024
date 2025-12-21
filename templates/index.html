@@ -34,11 +34,34 @@
 
         .right-sidebar {
             width: 280px;
+            min-width: 200px;
+            max-width: 600px;
             background: white;
             border-left: 2px solid #ddd;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
+            position: relative;
+        }
+
+        .resize-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 8px;
+            cursor: ew-resize;
+            background: transparent;
+            z-index: 1000;
+            transition: background 0.2s;
+        }
+
+        .resize-handle:hover {
+            background: rgba(0, 123, 255, 0.3);
+        }
+
+        .resize-handle:active {
+            background: rgba(0, 123, 255, 0.5);
         }
 
         .tabs {
@@ -150,6 +173,69 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.2);
             z-index: 1000;
+            max-width: 500px;
+        }
+
+        .prompt-dialog {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .prompt-dialog h2 {
+            margin-top: 0;
+            color: #007bff;
+            font-size: 24px;
+        }
+
+        .prompt-dialog p {
+            color: #666;
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+
+        .prompt-dialog input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin: 10px 0;
+            box-sizing: border-box;
+        }
+
+        .prompt-dialog input:focus {
+            border-color: #007bff;
+            outline: none;
+        }
+
+        .prompt-dialog button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .prompt-dialog button:hover {
+            background: #0056b3;
+        }
+
+        .prompt-dialog .example {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 10px 0;
+            border-left: 3px solid #007bff;
         }
 
         .legend {
@@ -212,6 +298,13 @@
             font-size: 10px;
             font-style: italic;
             color: #666;
+        }
+
+        .boat-marker {
+            font-size: 32px;
+            text-align: center;
+            filter: drop-shadow(3px 3px 3px rgba(0,0,0,0.4));
+            cursor: pointer;
         }
 
         .photo-marker {
@@ -372,6 +465,75 @@
             font-weight: bold;
             font-size: 11px;
         }
+
+        /* Mobile Responsive Styles */
+        @media screen and (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .right-sidebar {
+                width: 100% !important;
+                max-height: 40vh;
+                border-left: none;
+                border-top: 2px solid #ddd;
+            }
+
+            .resize-handle {
+                display: none;
+            }
+
+            #map {
+                height: 60vh;
+            }
+
+            .controls {
+                font-size: 12px;
+                padding: 10px;
+            }
+
+            button {
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+
+            .speed-control {
+                width: 100%;
+            }
+
+            #speed-slider {
+                width: 100px;
+            }
+
+            .info {
+                min-width: 100%;
+                margin-top: 5px;
+            }
+
+            .photo-modal {
+                right: 0;
+            }
+
+            .tab-button {
+                font-size: 11px;
+                padding: 10px 5px;
+            }
+        }
+
+        @media screen and (max-width: 480px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .speed-control {
+                justify-content: space-between;
+            }
+
+            button {
+                margin-bottom: 5px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -387,7 +549,10 @@
     <div class="main-content">
         <div id="map"></div>
 
-        <div class="right-sidebar">
+        <div class="right-sidebar" id="right-sidebar">
+            <!-- Resize handle -->
+            <div class="resize-handle" id="resize-handle"></div>
+
             <!-- Tab buttons -->
             <div class="tabs">
                 <button class="tab-button active" onclick="switchTab('home')">Home</button>
@@ -397,6 +562,18 @@
 
             <!-- Home Tab -->
             <div id="home-tab" class="tab-content active">
+                <div class="data-panel">
+                    <div class="data-panel-title">Track Directory</div>
+                    <div style="font-size: 11px;">
+                        <input type="text" id="track-directory" placeholder="Enter directory path (e.g., . or /path/to/tracks)"
+                               style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; margin-bottom: 8px;">
+                        <button onclick="updateTrackDirectory()" style="width: 100%; padding: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                            Load Tracks from Directory
+                        </button>
+                        <div id="directory-status" style="font-size: 10px; color: #666; margin-top: 5px; text-align: center;">Current: .</div>
+                    </div>
+                </div>
+
                 <div class="legend">
                     <div class="legend-title">Legend</div>
                     <div style="margin-top: 5px;">
@@ -506,7 +683,7 @@
                         <button onclick="addAnnotation()">Add Annotation</button>
                     </div>
                     <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 10px; color: #666;">
-                        Annotations are added at the current track position. Use the position slider in the Home tab to select where to add an annotation.
+                        <strong>Note:</strong> Annotations are added at the current track position. Use the position slider in the Home tab to select where to add an annotation.
                     </div>
                 </div>
 
@@ -514,12 +691,15 @@
                     <div class="data-panel-title">Manage Annotations</div>
                     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <button onclick="saveAnnotations()" style="flex: 1; padding: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                            Save Annotations
+                            Save to Track Directory
                         </button>
                         <label for="annotation-file-input" style="flex: 1; padding: 8px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; text-align: center;">
-                            Load Annotations
+                            Load from File
                             <input type="file" id="annotation-file-input" accept=".json" style="display: none;" onchange="loadAnnotations(event)">
                         </label>
+                    </div>
+                    <div style="font-size: 10px; color: #666; margin-top: 5px;">
+                        Annotations are saved as <code style="background: #e9ecef; padding: 2px 4px; border-radius: 2px;">sailing-annotations.json</code> in your track directory and auto-load on startup.
                     </div>
                 </div>
 
@@ -567,6 +747,7 @@
         let windMarker = null;
         let cogMarker = null;
         let awaMarker = null;
+        let boatMarker = null; // Simple boat position marker for GPX files
         let trackPolylines = [];
         let speed = 1;
         let panEnabled = false;
@@ -579,6 +760,7 @@
         let annotationMarkers = [];
         let totalDistanceNM = 0;
         let totalDistanceKM = 0;
+        let hasSailingData = false; // Flag to track if any loaded track has sailing data
 
         // Tab switching function
         function switchTab(tabName) {
@@ -725,17 +907,20 @@
             if (allPoints.length > 0 && currentIndex < allPoints.length) {
                 const point = allPoints[currentIndex];
 
-                windMarker.setLatLng([point.lat, point.lon]);
-                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
-                windMarker.setIcon(newWindArrowIcon);
+                // Update arrows (only if sailing data available)
+                if (hasSailingData) {
+                    windMarker.setLatLng([point.lat, point.lon]);
+                    const newWindArrowIcon = createArrowIcon(point.tws || 0, point.twa || 0, point.cog || 0);
+                    windMarker.setIcon(newWindArrowIcon);
 
-                cogMarker.setLatLng([point.lat, point.lon]);
-                const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
-                cogMarker.setIcon(newCOGArrowIcon);
+                    cogMarker.setLatLng([point.lat, point.lon]);
+                    const newCOGArrowIcon = createCOGArrowIcon(point.sog || 0, point.cog || 0);
+                    cogMarker.setIcon(newCOGArrowIcon);
 
-                awaMarker.setLatLng([point.lat, point.lon]);
-                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
-                awaMarker.setIcon(newAWAArrowIcon);
+                    awaMarker.setLatLng([point.lat, point.lon]);
+                    const newAWAArrowIcon = createAWAArrowIcon(point.aws || 0, point.awa || 0, point.cog || 0);
+                    awaMarker.setIcon(newAWAArrowIcon);
+                }
 
                 updateDataDisplay(point);
 
@@ -750,28 +935,34 @@
             showAnnotationPopup(annotation);
         }
 
-        // Save annotations to JSON file
-        function saveAnnotations() {
+        // Save annotations to JSON file in track directory
+        async function saveAnnotations() {
             if (annotations.length === 0) {
                 alert('No annotations to save');
                 return;
             }
 
-            // Create JSON data
-            const jsonData = JSON.stringify(annotations, null, 2);
+            try {
+                // Send annotations to server to save in track directory
+                const response = await fetch('/api/annotations', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ annotations: annotations })
+                });
 
-            // Create blob and download
-            const blob = new Blob([jsonData], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'sailing-annotations.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+                const data = await response.json();
 
-            alert(`Saved ${annotations.length} annotation(s) to sailing-annotations.json`);
+                if (data.status === 'success') {
+                    alert(data.message);
+                } else {
+                    alert('Error saving annotations: ' + data.message);
+                }
+            } catch (error) {
+                console.error('Error saving annotations:', error);
+                alert('Error saving annotations: ' + error.message);
+            }
         }
 
         // Load annotations from JSON file
@@ -835,16 +1026,27 @@
 
         // Helper function to update data display
         function updateDataDisplay(point) {
-            document.getElementById('data-time').textContent = point.utc;
-            document.getElementById('data-lat').textContent = point.lat.toFixed(6) + '°';
-            document.getElementById('data-lon').textContent = point.lon.toFixed(6) + '°';
-            document.getElementById('data-rpm').textContent = point.rpm;
-            document.getElementById('data-cog').textContent = point.cog.toFixed(1) + '°';
-            document.getElementById('data-sog').textContent = point.sog.toFixed(2) + ' kt';
-            document.getElementById('data-twa').textContent = point.twa.toFixed(1) + '°';
-            document.getElementById('data-tws').textContent = point.tws.toFixed(1) + ' kt';
-            document.getElementById('data-awa').textContent = point.awa.toFixed(1) + '°';
-            document.getElementById('data-aws').textContent = point.aws.toFixed(2) + ' kt';
+            document.getElementById('data-time').textContent = point.utc || '--';
+            document.getElementById('data-lat').textContent = point.lat ? point.lat.toFixed(6) + '°' : '--';
+            document.getElementById('data-lon').textContent = point.lon ? point.lon.toFixed(6) + '°' : '--';
+
+            // Check if this is estimated data (from GPX files)
+            const isEstimated = point.estimated === true;
+
+            // Show sailing data if available, or estimated values for GPX
+            if (hasSailingData) {
+                document.getElementById('data-rpm').textContent = point.rpm !== null ? point.rpm : '--';
+                document.getElementById('data-cog').textContent = point.cog !== null ? point.cog.toFixed(1) + '°' : '--';
+                document.getElementById('data-sog').textContent = point.sog !== null ? point.sog.toFixed(2) + ' kt' : '--';
+                document.getElementById('data-twa').textContent = point.twa !== null ? point.twa.toFixed(1) + '°' : '--';
+                document.getElementById('data-tws').textContent = point.tws !== null ? point.tws.toFixed(1) + ' kt' : '--';
+                document.getElementById('data-awa').textContent = point.awa !== null ? point.awa.toFixed(1) + '°' : '--';
+                document.getElementById('data-aws').textContent = point.aws !== null ? point.aws.toFixed(2) + ' kt' : '--';
+            } else if (isEstimated) {
+                // For GPX files, show estimated SOG and COG
+                document.getElementById('data-cog').textContent = point.cog !== null ? point.cog.toFixed(1) + '° (est.)' : '--';
+                document.getElementById('data-sog').textContent = point.sog !== null ? point.sog.toFixed(2) + ' kt (est.)' : '--';
+            }
         }
 
         // Map slider values (1-7) to speed multipliers
@@ -997,14 +1199,164 @@
             });
         }
 
+        // Load tracks from prompt dialog
+        async function loadTracksFromPrompt() {
+            const directoryInput = document.getElementById('prompt-directory');
+            const directory = directoryInput.value.trim() || '.';
+
+            try {
+                // Save the new directory configuration
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ track_directory: directory })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update configuration');
+                }
+
+                // Show loading message
+                document.getElementById('loading').innerHTML = '<div style="padding: 40px; text-align: center;"><h2>Loading tracks...</h2><p>Please wait...</p></div>';
+
+                // Reload the page to refresh everything
+                location.reload();
+
+            } catch (error) {
+                console.error('Error updating directory:', error);
+                alert('Error updating directory: ' + error.message);
+            }
+        }
+
+        // Update track directory configuration from Home tab
+        async function updateTrackDirectory() {
+            const directoryInput = document.getElementById('track-directory');
+            const directory = directoryInput.value.trim() || '.';
+
+            try {
+                // Save the new directory configuration
+                const response = await fetch('/api/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ track_directory: directory })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to update configuration');
+                }
+
+                // Update status
+                document.getElementById('directory-status').textContent = `Current: ${directory}`;
+
+                // Show loading message
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = 'Loading tracks from new directory...';
+
+                // Reload the page to refresh everything
+                location.reload();
+
+            } catch (error) {
+                console.error('Error updating directory:', error);
+                alert('Error updating directory: ' + error.message);
+            }
+        }
+
+        // Auto-load annotations if available
+        async function autoLoadAnnotations() {
+            try {
+                const response = await fetch('/api/annotations');
+                const data = await response.json();
+
+                if (data.status === 'success' && Array.isArray(data.annotations)) {
+                    // Clear existing annotations
+                    annotationMarkers.forEach(marker => map.removeLayer(marker));
+                    annotationMarkers = [];
+                    annotations = [];
+
+                    // Load annotations from server
+                    data.annotations.forEach(annotation => {
+                        if (annotation.text && annotation.lat && annotation.lon && annotation.timestamp !== undefined && annotation.index !== undefined) {
+                            annotations.push(annotation);
+
+                            // Add marker to map
+                            const annotationIcon = L.divIcon({
+                                html: '📝',
+                                iconSize: [24, 24],
+                                className: 'annotation-marker',
+                                iconAnchor: [12, 12]
+                            });
+
+                            const marker = L.marker([annotation.lat, annotation.lon], { icon: annotationIcon })
+                                .addTo(map)
+                                .on('click', function() {
+                                    showAnnotationPopup(annotation);
+                                });
+
+                            annotationMarkers.push(marker);
+                        }
+                    });
+
+                    // Update annotations list
+                    updateAnnotationsList();
+
+                    console.log(`Auto-loaded ${annotations.length} annotation(s) from ${data.file}`);
+                } else if (data.status === 'not_found') {
+                    console.log('No annotation file found in track directory');
+                } else if (data.status === 'error') {
+                    console.error('Error loading annotations:', data.message);
+                }
+            } catch (error) {
+                console.error('Error auto-loading annotations:', error);
+            }
+        }
+
         // Initialize the map
         async function initMap() {
             try {
+                // Load current configuration
+                const configResponse = await fetch('/api/config');
+                const config = await configResponse.json();
+                const currentDirectory = config.track_directory || '.';
+
+                // Update directory input and status
+                document.getElementById('track-directory').value = currentDirectory;
+                document.getElementById('directory-status').textContent = `Current: ${currentDirectory}`;
+
                 // Fetch track data
                 const response = await fetch('/api/tracks');
                 const data = await response.json();
                 tracks = data.tracks;
                 bounds = data.bounds;
+
+                // Check if we have any tracks
+                if (tracks.length === 0) {
+                    document.getElementById('loading').innerHTML = `
+                        <div class="prompt-dialog">
+                            <h2>📂 Welcome to Sailing Track Visualizer</h2>
+                            <p>To get started, please enter the location of your tracking files.</p>
+                            <div class="example">
+                                <strong>Examples:</strong><br>
+                                Current directory: .<br>
+                                Windows: C:\\Users\\username\\Documents\\tracks<br>
+                                Or: C:/Users/username/Documents/tracks<br>
+                                Linux/Mac: /home/username/tracks
+                            </div>
+                            <input type="text" id="prompt-directory" placeholder="Enter directory path..." value="${currentDirectory}">
+                            <button onclick="loadTracksFromPrompt()">Load Tracks</button>
+                            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                                Supported formats: JSON (export *.json) and GPX (*.gpx)
+                            </p>
+                        </div>
+                    `;
+                    return; // Don't initialize the map if there are no tracks
+                }
+
+                // Check if any track has sailing data
+                hasSailingData = tracks.some(track => track.has_sailing_data);
 
                 // Hide loading indicator
                 document.getElementById('loading').style.display = 'none';
@@ -1026,17 +1378,23 @@
 
                 // Draw all tracks on the map with line style based on RPM
                 tracks.forEach((track, index) => {
-                    // Draw segments: blue when rpm=0 (sailing), red when rpm>0 (motoring)
+                    // Draw segments
                     for (let i = 0; i < track.points.length - 1; i++) {
                         const p1 = track.points[i];
                         const p2 = track.points[i + 1];
 
-                        // Determine color based on RPM
+                        // Determine color based on whether sailing data is available
                         let segmentColor;
-                        if (p1.rpm === 0 && p2.rpm === 0) {
-                            segmentColor = 'blue'; // Blue for sailing
+                        if (track.has_sailing_data) {
+                            // If sailing data available: blue when rpm=0 (sailing), red when rpm>0 (motoring)
+                            if (p1.rpm === 0 && p2.rpm === 0) {
+                                segmentColor = 'blue'; // Blue for sailing
+                            } else {
+                                segmentColor = 'red'; // Red for motoring
+                            }
                         } else {
-                            segmentColor = 'red'; // Red for motoring
+                            // If only tracking data available: solid blue
+                            segmentColor = 'blue';
                         }
 
                         const segment = L.polyline(
@@ -1097,56 +1455,94 @@
                     ]);
                 }
 
-                // Add event listeners for arrow toggles
-                document.getElementById('toggle-wind').addEventListener('change', (e) => {
-                    showWindArrow = e.target.checked;
-                    if (showWindArrow) {
-                        windMarker.addTo(map);
-                    } else {
-                        map.removeLayer(windMarker);
-                    }
-                });
+                // Hide or show UI elements based on sailing data availability
+                if (!hasSailingData) {
+                    // Hide arrow legend items
+                    const arrowLegend = document.querySelector('.legend div:nth-child(2)');
+                    if (arrowLegend) arrowLegend.style.display = 'none';
 
-                document.getElementById('toggle-cog').addEventListener('change', (e) => {
-                    showCogArrow = e.target.checked;
-                    if (showCogArrow) {
-                        cogMarker.addTo(map);
-                    } else {
-                        map.removeLayer(cogMarker);
-                    }
-                });
+                    // Hide sailing-specific data rows in data panel (keep SOG and COG for GPX)
+                    const sailingOnlyRows = ['rpm', 'twa', 'tws', 'awa', 'aws'];
+                    sailingOnlyRows.forEach(id => {
+                        const row = document.getElementById(`data-${id}`)?.parentElement;
+                        if (row) row.style.display = 'none';
+                    });
 
-                document.getElementById('toggle-awa').addEventListener('change', (e) => {
-                    showAwaArrow = e.target.checked;
-                    if (showAwaArrow) {
-                        awaMarker.addTo(map);
-                    } else {
-                        map.removeLayer(awaMarker);
-                    }
-                });
+                    // Make sure SOG and COG are visible for GPX files with estimated values
+                    ['sog', 'cog'].forEach(id => {
+                        const row = document.getElementById(`data-${id}`)?.parentElement;
+                        if (row) row.style.display = '';
+                    });
+                }
 
-                // Create wind arrow marker (blue)
+                // Add event listeners for arrow toggles (only if sailing data available)
+                if (hasSailingData) {
+                    document.getElementById('toggle-wind').addEventListener('change', (e) => {
+                        showWindArrow = e.target.checked;
+                        if (showWindArrow) {
+                            windMarker.addTo(map);
+                        } else {
+                            map.removeLayer(windMarker);
+                        }
+                    });
+
+                    document.getElementById('toggle-cog').addEventListener('change', (e) => {
+                        showCogArrow = e.target.checked;
+                        if (showCogArrow) {
+                            cogMarker.addTo(map);
+                        } else {
+                            map.removeLayer(cogMarker);
+                        }
+                    });
+
+                    document.getElementById('toggle-awa').addEventListener('change', (e) => {
+                        showAwaArrow = e.target.checked;
+                        if (showAwaArrow) {
+                            awaMarker.addTo(map);
+                        } else {
+                            map.removeLayer(awaMarker);
+                        }
+                    });
+                }
+
+                // Create position markers
                 if (allPoints.length > 0) {
                     const firstPoint = allPoints[0];
-                    const windArrowIcon = createArrowIcon(firstPoint.tws, firstPoint.twa, firstPoint.cog);
-                    windMarker = L.marker(
-                        [firstPoint.lat, firstPoint.lon],
-                        { icon: windArrowIcon }
-                    ).addTo(map);
 
-                    // Create COG arrow marker (green)
-                    const cogArrowIcon = createCOGArrowIcon(firstPoint.sog, firstPoint.cog);
-                    cogMarker = L.marker(
-                        [firstPoint.lat, firstPoint.lon],
-                        { icon: cogArrowIcon }
-                    ).addTo(map);
+                    if (hasSailingData) {
+                        // Create arrow markers for sailing data
+                        const windArrowIcon = createArrowIcon(firstPoint.tws || 0, firstPoint.twa || 0, firstPoint.cog || 0);
+                        windMarker = L.marker(
+                            [firstPoint.lat, firstPoint.lon],
+                            { icon: windArrowIcon }
+                        ).addTo(map);
 
-                    // Create AWA arrow marker (orange)
-                    const awaArrowIcon = createAWAArrowIcon(firstPoint.aws, firstPoint.awa, firstPoint.cog);
-                    awaMarker = L.marker(
-                        [firstPoint.lat, firstPoint.lon],
-                        { icon: awaArrowIcon }
-                    ).addTo(map);
+                        // Create COG arrow marker (green)
+                        const cogArrowIcon = createCOGArrowIcon(firstPoint.sog || 0, firstPoint.cog || 0);
+                        cogMarker = L.marker(
+                            [firstPoint.lat, firstPoint.lon],
+                            { icon: cogArrowIcon }
+                        ).addTo(map);
+
+                        // Create AWA arrow marker (orange)
+                        const awaArrowIcon = createAWAArrowIcon(firstPoint.aws || 0, firstPoint.awa || 0, firstPoint.cog || 0);
+                        awaMarker = L.marker(
+                            [firstPoint.lat, firstPoint.lon],
+                            { icon: awaArrowIcon }
+                        ).addTo(map);
+                    } else {
+                        // Create simple boat position marker for GPX files (no sailing data)
+                        const boatIcon = L.divIcon({
+                            html: '⛵',
+                            iconSize: [32, 32],
+                            className: 'boat-marker',
+                            iconAnchor: [16, 16]
+                        });
+                        boatMarker = L.marker(
+                            [firstPoint.lat, firstPoint.lon],
+                            { icon: boatIcon }
+                        ).addTo(map);
+                    }
 
                     // Initialize data panel with first point
                     updateDataDisplay(firstPoint);
@@ -1166,22 +1562,35 @@
                     if (allPoints.length > 0) {
                         const point = allPoints[currentIndex];
 
-                        // Update arrows
-                        windMarker.setLatLng([point.lat, point.lon]);
-                        const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
-                        windMarker.setIcon(newWindArrowIcon);
+                        // Update position markers
+                        if (hasSailingData) {
+                            // Update arrows (only if sailing data available)
+                            windMarker.setLatLng([point.lat, point.lon]);
+                            const newWindArrowIcon = createArrowIcon(point.tws || 0, point.twa || 0, point.cog || 0);
+                            windMarker.setIcon(newWindArrowIcon);
 
-                        cogMarker.setLatLng([point.lat, point.lon]);
-                        const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
-                        cogMarker.setIcon(newCOGArrowIcon);
+                            cogMarker.setLatLng([point.lat, point.lon]);
+                            const newCOGArrowIcon = createCOGArrowIcon(point.sog || 0, point.cog || 0);
+                            cogMarker.setIcon(newCOGArrowIcon);
 
-                        awaMarker.setLatLng([point.lat, point.lon]);
-                        const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
-                        awaMarker.setIcon(newAWAArrowIcon);
+                            awaMarker.setLatLng([point.lat, point.lon]);
+                            const newAWAArrowIcon = createAWAArrowIcon(point.aws || 0, point.awa || 0, point.cog || 0);
+                            awaMarker.setIcon(newAWAArrowIcon);
 
-                        // Pan if enabled
-                        if (panEnabled) {
-                            map.panTo([point.lat, point.lon]);
+                            // Pan if enabled
+                            if (panEnabled) {
+                                map.panTo([point.lat, point.lon]);
+                            }
+                        } else {
+                            // Update boat marker for GPX files
+                            if (boatMarker) {
+                                boatMarker.setLatLng([point.lat, point.lon]);
+
+                                // Pan if enabled
+                                if (panEnabled) {
+                                    map.panTo([point.lat, point.lon]);
+                                }
+                            }
                         }
 
                         // Update data display
@@ -1196,6 +1605,9 @@
                 });
 
                 // No animation polyline - boat marker only to preserve original track visibility
+
+                // Auto-load annotations if available
+                await autoLoadAnnotations();
 
             } catch (error) {
                 console.error('Error loading tracks:', error);
@@ -1227,24 +1639,38 @@
 
                 const point = allPoints[currentIndex];
 
-                // Update wind arrow position and icon (blue)
-                windMarker.setLatLng([point.lat, point.lon]);
-                const newWindArrowIcon = createArrowIcon(point.tws, point.twa, point.cog);
-                windMarker.setIcon(newWindArrowIcon);
+                // Update position markers
+                if (hasSailingData) {
+                    // Update arrow positions and icons (only if sailing data available)
+                    // Update wind arrow position and icon (blue)
+                    windMarker.setLatLng([point.lat, point.lon]);
+                    const newWindArrowIcon = createArrowIcon(point.tws || 0, point.twa || 0, point.cog || 0);
+                    windMarker.setIcon(newWindArrowIcon);
 
-                // Update COG arrow position and icon (green)
-                cogMarker.setLatLng([point.lat, point.lon]);
-                const newCOGArrowIcon = createCOGArrowIcon(point.sog, point.cog);
-                cogMarker.setIcon(newCOGArrowIcon);
+                    // Update COG arrow position and icon (green)
+                    cogMarker.setLatLng([point.lat, point.lon]);
+                    const newCOGArrowIcon = createCOGArrowIcon(point.sog || 0, point.cog || 0);
+                    cogMarker.setIcon(newCOGArrowIcon);
 
-                // Update AWA arrow position and icon (orange)
-                awaMarker.setLatLng([point.lat, point.lon]);
-                const newAWAArrowIcon = createAWAArrowIcon(point.aws, point.awa, point.cog);
-                awaMarker.setIcon(newAWAArrowIcon);
+                    // Update AWA arrow position and icon (orange)
+                    awaMarker.setLatLng([point.lat, point.lon]);
+                    const newAWAArrowIcon = createAWAArrowIcon(point.aws || 0, point.awa || 0, point.cog || 0);
+                    awaMarker.setIcon(newAWAArrowIcon);
 
-                // Pan map to center on current position if enabled
-                if (panEnabled) {
-                    map.panTo([point.lat, point.lon]);
+                    // Pan map to center on current position if enabled
+                    if (panEnabled) {
+                        map.panTo([point.lat, point.lon]);
+                    }
+                } else {
+                    // Update simple boat marker for GPX files
+                    if (boatMarker) {
+                        boatMarker.setLatLng([point.lat, point.lon]);
+
+                        // Pan map to center on current position if enabled
+                        if (panEnabled) {
+                            map.panTo([point.lat, point.lon]);
+                        }
+                    }
                 }
 
                 // Update info in bottom bar and right sidebar
@@ -1291,9 +1717,19 @@
 
             if (allPoints.length > 0) {
                 const firstPoint = allPoints[0];
-                windMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
-                cogMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
-                awaMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+
+                // Update position markers
+                if (hasSailingData) {
+                    // Update arrows (only if sailing data available)
+                    windMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                    cogMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                    awaMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                } else {
+                    // Update boat marker for GPX files
+                    if (boatMarker) {
+                        boatMarker.setLatLng([firstPoint.lat, firstPoint.lon]);
+                    }
+                }
 
                 // Center map at start position
                 map.panTo([firstPoint.lat, firstPoint.lon]);
@@ -1491,6 +1927,83 @@
 
         // Initialize on page load
         window.addEventListener('load', initMap);
+
+        // Resize handle functionality
+        (function() {
+            const resizeHandle = document.getElementById('resize-handle');
+            const sidebar = document.getElementById('right-sidebar');
+            let isResizing = false;
+            let startX = 0;
+            let startWidth = 0;
+
+            resizeHandle.addEventListener('mousedown', function(e) {
+                isResizing = true;
+                startX = e.clientX;
+                startWidth = sidebar.offsetWidth;
+                document.body.style.cursor = 'ew-resize';
+                document.body.style.userSelect = 'none';
+                e.preventDefault();
+            });
+
+            document.addEventListener('mousemove', function(e) {
+                if (!isResizing) return;
+
+                // Calculate new width (subtract because we're dragging from the left edge)
+                const diff = startX - e.clientX;
+                const newWidth = startWidth + diff;
+
+                // Apply constraints
+                const minWidth = 200;
+                const maxWidth = 600;
+                const constrainedWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
+
+                sidebar.style.width = constrainedWidth + 'px';
+
+                // Invalidate map size so Leaflet adjusts
+                if (map) {
+                    setTimeout(() => map.invalidateSize(), 0);
+                }
+            });
+
+            document.addEventListener('mouseup', function() {
+                if (isResizing) {
+                    isResizing = false;
+                    document.body.style.cursor = '';
+                    document.body.style.userSelect = '';
+                }
+            });
+
+            // Touch support for mobile
+            resizeHandle.addEventListener('touchstart', function(e) {
+                isResizing = true;
+                startX = e.touches[0].clientX;
+                startWidth = sidebar.offsetWidth;
+                e.preventDefault();
+            });
+
+            document.addEventListener('touchmove', function(e) {
+                if (!isResizing) return;
+
+                const diff = startX - e.touches[0].clientX;
+                const newWidth = startWidth + diff;
+
+                const minWidth = 200;
+                const maxWidth = 600;
+                const constrainedWidth = Math.min(Math.max(newWidth, minWidth), maxWidth);
+
+                sidebar.style.width = constrainedWidth + 'px';
+
+                if (map) {
+                    setTimeout(() => map.invalidateSize(), 0);
+                }
+            });
+
+            document.addEventListener('touchend', function() {
+                if (isResizing) {
+                    isResizing = false;
+                }
+            });
+        })();
     </script>
 </body>
 </html>

@@ -1,20 +1,23 @@
 # Sailing Track Visualizer
 
-A Flask web application that visualizes sailing GPS tracks from JSON files on an interactive map with animation.
+A Flask web application that visualizes sailing GPS tracks from JSON and GPX files on an interactive map with animation.
 
 ## Features
 
 ### Map Display
 - Displays multiple sailing tracks on an interactive OpenStreetMap
-- Track line color based on engine RPM:
-  - **Blue line**: Sailing under wind power (RPM = 0)
-  - **Red line**: Motoring with engine (RPM > 0)
+- Supports both JSON files (with full sailing data) and GPX files (basic GPS tracks)
+- Track line color:
+  - **JSON files with sailing data**:
+    - Blue line: Sailing under wind power (RPM = 0)
+    - Red line: Motoring with engine (RPM > 0)
+  - **GPX files** (tracking data only): Solid blue line
 - Shows start (green) and end (red) markers for each track
 - Automatically fits the map to show all tracks
 - Original track remains fully visible (no overlaying animation trail)
 
 ### Animation System
-- Triple-arrow animation showing wind and boat movement:
+- Triple-arrow animation showing wind and boat movement **(JSON files with sailing data only)**:
   - **Blue arrow**: True Wind conditions
     - Points away from True Wind Angle (TWA)
     - Length proportional to True Wind Speed (TWS)
@@ -31,23 +34,33 @@ A Flask web application that visualizes sailing GPS tracks from JSON files on an
 - Play, pause, and reset controls
 - Reverse animation to play backwards through the track
 - Auto-pan option to keep boat centered on map during animation
+- **Note**: GPX files without sailing data will not display arrows
 
 ### Tabbed Interface
-The application features a three-tab interface on the right side:
+The application features a resizable three-tab interface on the right side:
+
+**Resizing the Sidebar:**
+- Hover over the left edge of the sidebar to see the resize cursor
+- Click and drag left or right to resize the sidebar
+- Minimum width: 200px
+- Maximum width: 600px
+- The map automatically adjusts as you resize
+- Works with both mouse and touch input
 
 #### Home Tab
-- **Interactive Legend** with checkboxes to show/hide each arrow type independently
+- **Track Directory Configuration**:
+  - Enter the path to the directory containing your track files
+  - Default is "." (current directory)
+  - Click "Load Tracks from Directory" to load tracks from the specified location
+  - Configuration is automatically saved and persists between sessions
+- **Interactive Legend** with checkboxes to show/hide each arrow type independently *(shown only for JSON files with sailing data)*
 - **Distance Travelled** display showing distance from start to current position:
   - Distance in nautical miles
   - Distance in kilometers
   - Updates dynamically as you move through the track
-- **Current Data** display showing real-time information:
-  - Date/Time (UTC)
-  - Latitude and Longitude coordinates
-  - Engine RPM
-  - Course Over Ground (COG) and Speed Over Ground (SOG)
-  - True Wind Angle (TWA) and True Wind Speed (TWS)
-  - Apparent Wind Angle (AWA) and Apparent Wind Speed (AWS)
+- **Current Data** display showing information based on file type:
+  - **JSON files with sailing data**: Date/Time, Latitude, Longitude, RPM, COG, SOG, TWA, TWS, AWA, AWS
+  - **GPX files**: Date/Time, Latitude, Longitude only
 - **Position Control** slider to manually navigate through the track
 
 #### Photo Tab
@@ -62,8 +75,9 @@ The application features a three-tab interface on the right side:
 - Click annotation icons to view the text and timestamp
 - Annotations list showing all annotations
 - Click annotations in the list to jump to that position on the track
-- **Save Annotations**: Export all annotations to a JSON file for later use
-- **Load Annotations**: Import previously saved annotations from a JSON file
+- **Auto-load**: Annotations are automatically loaded from `sailing-annotations.json` in the track directory when the app starts (if the file exists)
+- **Save Annotations**: Export all annotations to `sailing-annotations.json` for later use
+- **Load Annotations**: Manually import annotations from a JSON file
 
 ## Prerequisites
 
@@ -93,7 +107,19 @@ The application features a three-tab interface on the right side:
 
 ## Usage
 
-1. Ensure your JSON track files are in the project root directory with names matching the pattern `export *.json`
+### Running on Your Computer
+
+1. **Option 1: Default Directory (Project Root)**
+   - Place your track files in the project root directory:
+     - JSON files: Use filenames matching the pattern `export *.json` (with full sailing data)
+     - GPX files: Use any `.gpx` filename (basic GPS tracking data)
+   - The app will automatically load files from the current directory (`.`)
+
+   **Option 2: Custom Directory**
+   - Place your track files in any directory on your computer
+   - After starting the app, use the "Track Directory" input in the Home tab to specify the path
+   - Click "Load Tracks from Directory" to load files from that location
+   - The directory path is saved and will be remembered for future sessions
 
 2. Run the Flask application using uv:
    ```bash
@@ -117,6 +143,34 @@ The application features a three-tab interface on the right side:
    http://localhost:5001
    ```
 
+### Accessing from Android Phone (or other devices)
+
+The app is already configured to work on your local network, allowing you to access it from your Android phone or any device on the same network.
+
+1. **Start the Flask app** on your computer (as shown above)
+
+2. **Find your computer's IP address:**
+   - On Windows: Open Command Prompt and run `ipconfig`
+     - Look for "IPv4 Address" under your active network adapter (e.g., `192.168.2.225`)
+   - On macOS/Linux: Open Terminal and run `ifconfig` or `ip addr`
+     - Look for your local network IP address (usually starts with 192.168.x.x or 10.0.x.x)
+
+3. **Connect your Android phone** to the same Wi-Fi network as your computer
+
+4. **Open a web browser on your Android phone** (Chrome, Firefox, etc.)
+
+5. **Navigate to your computer's IP address:**
+   ```
+   http://192.168.2.225:5001
+   ```
+   (Replace `192.168.2.225` with your actual computer's IP address)
+
+**Important Notes:**
+- Both devices must be on the same Wi-Fi network
+- Some corporate or public Wi-Fi networks may block device-to-device communication
+- If you have a firewall, you may need to allow incoming connections on port 5001
+- The app is mobile-responsive and should work well on phone screens
+
 4. Use the controls and tabs:
 
    **Bottom Controls:**
@@ -135,9 +189,13 @@ The application features a three-tab interface on the right side:
      - Save all annotations to a JSON file
      - Load previously saved annotations from a JSON file
 
-## JSON File Format
+## File Formats
 
-The application expects JSON files with the following structure:
+The application supports two file formats:
+
+### JSON File Format (with Sailing Data)
+
+JSON files provide full sailing instrumentation data. The expected structure is:
 
 ```json
 [
@@ -170,6 +228,31 @@ Optional fields (displayed in info panel):
 - `sog`: Speed over ground
 - `cog`: Course over ground
 
+### GPX File Format (Basic GPS Tracking)
+
+GPX files provide basic GPS tracking data without sailing instrumentation. The application automatically parses standard GPX files:
+
+```xml
+<?xml version="1.0"?>
+<gpx version="1.1" creator="YourGPSDevice">
+  <trk>
+    <name>Track Name</name>
+    <trkseg>
+      <trkpt lat="38.9246304" lon="20.9019872">
+        <time>2024-08-21T11:26:00Z</time>
+      </trkpt>
+      <!-- More track points... -->
+    </trkseg>
+  </trk>
+</gpx>
+```
+
+GPX files will display:
+- Track line in solid blue
+- Start and end markers
+- Basic position data (latitude, longitude, timestamp)
+- No arrows or sailing instrumentation data
+
 ## Project Structure
 
 ```
@@ -178,7 +261,8 @@ Claude-sailing2024/
 ├── templates/
 │   └── index.html         # Map visualization interface
 ├── pyproject.toml         # Project dependencies
-├── export *.json          # Track data files
+├── export *.json          # JSON track data files (with sailing data)
+├── *.gpx                  # GPX track data files (basic GPS)
 └── README.md              # This file
 ```
 
@@ -187,13 +271,15 @@ Claude-sailing2024/
 - **Backend**: Flask (Python web framework)
 - **Frontend**: HTML, CSS, JavaScript
 - **Mapping**: Leaflet.js with OpenStreetMap tiles
+- **File Parsing**: gpxpy for GPX file support
 - **Package Management**: uv
 
 ## Troubleshooting
 
 - **Map doesn't load**: Ensure you have an internet connection (required for OpenStreetMap tiles)
-- **No tracks visible**: Check that JSON files are in the correct format and location
-- **Animation doesn't start**: Verify that your JSON files contain valid latitude/longitude coordinates
+- **No tracks visible**: Check that JSON or GPX files are in the correct format and location
+- **Animation doesn't start**: Verify that your track files contain valid latitude/longitude coordinates
+- **No arrows displayed**: Arrows are only shown for JSON files with sailing data, not for GPX files
 
 ## License
 
