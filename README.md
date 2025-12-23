@@ -35,6 +35,10 @@ A Flask web application that visualizes sailing GPS tracks from JSON and GPX fil
 - Reverse animation to play backwards through the track
 - Auto-pan option to keep boat centered on map during animation
 - **Note**: GPX files without sailing data will not display arrows
+- **Smart Icon Selection for GPX tracks**: Automatically detects if the track is over water or land
+  - Water tracks: Shows boat icon ⛵
+  - Land tracks: Shows person icon 🚶
+  - Detection uses OpenStreetMap reverse geocoding to sample key points along the track
 
 ### Tabbed Interface
 The application features a resizable three-tab interface on the right side:
@@ -59,15 +63,19 @@ The application features a resizable three-tab interface on the right side:
   - Distance in kilometers
   - Updates dynamically as you move through the track
 - **Current Data** display showing information based on file type:
-  - **JSON files with sailing data**: Date/Time, Latitude, Longitude, RPM, COG, SOG, TWA, TWS, AWA, AWS
-  - **GPX files**: Date/Time, Latitude, Longitude only
+  - **JSON files with sailing data**: Date/Time, Latitude, Longitude, RPM, COG, SOG (knots), TWA, TWS, AWA, AWS
+  - **GPX files**: Date/Time, Latitude, Longitude, COG (bearing, estimated), SOG (km/h, estimated)
 - **Position Control** slider to manually navigate through the track
 
 #### Photo Tab
 - Upload photos with GPS metadata
+- **Optional Timestamp Filtering**: Checkbox to filter photos by track time range
+  - When enabled: Only photos taken between the start and end timestamps of the track data are displayed
+  - When disabled: All photos with GPS metadata are shown regardless of timestamp
 - Photos displayed as camera icons at their GPS coordinates on the map
 - Click camera icons to view full-size photos
 - Photo popups show filename and timestamp
+- Status shows how many photos were filtered out when filtering is enabled
 
 #### Annotation Tab
 - Add text annotations at any track position
@@ -251,7 +259,9 @@ GPX files will display:
 - Track line in solid blue
 - Start and end markers
 - Basic position data (latitude, longitude, timestamp)
+- Estimated SOG (Speed Over Ground) in **km/h** and COG (Course Over Ground) as bearing
 - No arrows or sailing instrumentation data
+- Automatic land/water detection to show appropriate icon (boat ⛵ for water, person 🚶 for land)
 
 ## Project Structure
 

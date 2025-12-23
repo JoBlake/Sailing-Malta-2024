@@ -241,10 +241,16 @@ def update_config():
 
 @app.route('/api/annotations', methods=['GET'])
 def get_annotations():
-    """API endpoint that returns annotations if they exist in the track directory"""
+    """API endpoint that returns annotations if they exist in the track directory or project root"""
     config = load_config()
     directory = config.get('track_directory', '.')
+
+    # Try track directory first
     annotation_file = os.path.join(directory, 'sailing-annotations.json')
+
+    # If not found in track directory, try project root as fallback
+    if not os.path.exists(annotation_file):
+        annotation_file = 'sailing-annotations.json'
 
     if os.path.exists(annotation_file):
         try:
@@ -261,9 +267,11 @@ def get_annotations():
                 'message': str(e)
             })
     else:
+        # Initialize with empty annotations array if file doesn't exist
         return jsonify({
-            'status': 'not_found',
-            'message': 'No annotation file found'
+            'status': 'success',
+            'annotations': [],
+            'message': 'No annotation file found, initialized with empty annotations'
         })
 
 @app.route('/api/annotations', methods=['POST'])
@@ -272,6 +280,13 @@ def save_annotations():
     try:
         config = load_config()
         directory = config.get('track_directory', '.')
+
+        # Check if directory exists, fall back to current directory if not
+        if not os.path.exists(directory) or not os.path.isdir(directory):
+            sys.stderr.write(f"Warning: Directory '{directory}' does not exist, using current directory instead\n")
+            sys.stderr.flush()
+            directory = '.'
+
         annotation_file = os.path.join(directory, 'sailing-annotations.json')
 
         # Get annotations from request
@@ -287,6 +302,133 @@ def save_annotations():
             'message': f'Saved {len(annotations)} annotation(s) to {annotation_file}',
             'file': annotation_file
         })
+    except Exception as e:
+        sys.stderr.write(f"Error saving annotations: {str(e)}\n")
+        sys.stderr.flush()
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/api/upload-files', methods=['POST'])
+def upload_files():
+    """API endpoint to process uploaded track files"""
+    try:
+        if 'files' not in request.files:
+            return jsonify({'status': 'error', 'message': 'No files provided'}), 400
+
+        files = request.files.getlist('files')
+        all_tracks = []
+        all_coords = []
+
+        for file in files:
+            filename = file.filename.lower()
+
+            if filename.endswith('.json'):
+                # Process JSON file
+                content = file.read().decode('utf-8')
+                data = json.loads(content)
+                track = []
+                for point in data:
+                    track.append({
+                        'lat': float(point.get('lat', 0)),
+                        'lon': float(point.get('lon', 0)),
+                        'rpm': int(point.get('rpm', 0)),
+                        'tws': float(point.get('tws', 0)),
+                        'twa': float(point.get('twa', 0)),
+                        'utc': point.get('utc', ''),
+                        'sog': float(point.get('sog', 0)),
+                        'cog': float(point.get('cog', 0)),
+                        'aws': float(point.get('aws', 0)),
+                        'awa': float(point.get('awa', 0))
+                    })
+
+                for point in track:
+                    all_coords.append([point['lat'], point['lon']])
+
+                all_tracks.append({
+                    'name': file.filename,
+                    'points': track,
+                    'has_sailing_data': True
+                })
+
+            elif filename.endswith('.gpx'):
+                # Process GPX file
+                content = file.read().decode('utf-8')
+                gpx = gpxpy.parse(content)
+                track = []
+
+                for gpx_track in gpx.tracks:
+                    for segment in gpx_track.segments:
+                        prev_point = None
+                        prev_time = None
+
+                        for point in segment.points:
+                            sog_est = None
+                            cog_est = None
+
+                            if prev_point is not None:
+                                cog_est = calculate_bearing(
+                                    prev_point.latitude, prev_point.longitude,
+                                    point.latitude, point.longitude
+                                )
+
+                                if point.time and prev_time:
+                                    time_diff = (point.time - prev_time).total_seconds() / 3600
+                                    if time_diff > 0:
+                                        distance = calculate_distance_nm(
+                                            prev_point.latitude, prev_point.longitude,
+                                            point.latitude, point.longitude
+                                        )
+                                        sog_est = distance / time_diff
+
+                            track.append({
+                                'lat': point.latitude,
+                                'lon': point.longitude,
+                                'rpm': None,
+                                'tws': None,
+                                'twa': None,
+                                'utc': point.time.isoformat() if point.time else '',
+                                'sog': sog_est,
+                                'cog': cog_est,
+                                'aws': None,
+                                'awa': None,
+                                'estimated': True
+                            })
+
+                            prev_point = point
+                            prev_time = point.time
+
+                for point in track:
+                    all_coords.append([point['lat'], point['lon']])
+
+                all_tracks.append({
+                    'name': file.filename,
+                    'points': track,
+                    'has_sailing_data': False
+                })
+
+        # Calculate bounds
+        if all_coords:
+            lats = [coord[0] for coord in all_coords]
+            lons = [coord[1] for coord in all_coords]
+            bounds = {
+                'min_lat': min(lats),
+                'max_lat': max(lats),
+                'min_lon': min(lons),
+                'max_lon': max(lons),
+                'center_lat': (min(lats) + max(lats)) / 2,
+                'center_lon': (min(lons) + max(lons)) / 2
+            }
+        else:
+            bounds = None
+
+        return jsonify({
+            'status': 'success',
+            'tracks': all_tracks,
+            'bounds': bounds
+        })
+
     except Exception as e:
         return jsonify({
             'status': 'error',

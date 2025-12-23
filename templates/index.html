@@ -565,8 +565,14 @@
                 <div class="data-panel">
                     <div class="data-panel-title">Track Directory</div>
                     <div style="font-size: 11px;">
-                        <input type="text" id="track-directory" placeholder="Enter directory path (e.g., . or /path/to/tracks)"
-                               style="width: 100%; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px; margin-bottom: 8px;">
+                        <div style="display: flex; gap: 5px; margin-bottom: 8px;">
+                            <input type="text" id="track-directory" placeholder="Enter directory path"
+                                   style="flex: 1; padding: 6px; border: 1px solid #ddd; border-radius: 4px; font-size: 11px;">
+                            <label for="folder-picker" style="padding: 6px 12px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px; white-space: nowrap;">
+                                📁 Browse Files
+                                <input type="file" id="folder-picker" multiple accept=".json,.gpx" style="display: none;" onchange="handleFileSelect(event)">
+                            </label>
+                        </div>
                         <button onclick="updateTrackDirectory()" style="width: 100%; padding: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                             Load Tracks from Directory
                         </button>
@@ -666,6 +672,12 @@
                             Select Photos
                             <input type="file" id="photo-upload" multiple accept="image/*" style="display: none;">
                         </label>
+                        <div style="margin-top: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 11px;">
+                                <input type="checkbox" id="filter-photos-by-time" checked style="cursor: pointer;">
+                                <span>Only show photos taken during track time</span>
+                            </label>
+                        </div>
                         <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos loaded</div>
                         <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 10px; color: #666;">
                             <strong>Instructions:</strong> Select photos with GPS metadata. They will appear as camera icons on the map at their GPS coordinates. Click on the icons to view full-size photos.
@@ -691,7 +703,7 @@
                     <div class="data-panel-title">Manage Annotations</div>
                     <div style="display: flex; gap: 10px; margin-bottom: 10px;">
                         <button onclick="saveAnnotations()" style="flex: 1; padding: 8px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
-                            Save to Track Directory
+                            Save Annotations
                         </button>
                         <label for="annotation-file-input" style="flex: 1; padding: 8px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; text-align: center;">
                             Load from File
@@ -699,7 +711,7 @@
                         </label>
                     </div>
                     <div style="font-size: 10px; color: #666; margin-top: 5px;">
-                        Annotations are saved as <code style="background: #e9ecef; padding: 2px 4px; border-radius: 2px;">sailing-annotations.json</code> in your track directory and auto-load on startup.
+                        <strong>Save location:</strong> Saves as <code style="background: #e9ecef; padding: 2px 4px; border-radius: 2px;">sailing-annotations.json</code> in your track directory (or project root if directory doesn't exist). The success message will show the actual save location.
                     </div>
                 </div>
 
@@ -761,6 +773,135 @@
         let totalDistanceNM = 0;
         let totalDistanceKM = 0;
         let hasSailingData = false; // Flag to track if any loaded track has sailing data
+        let isOverWater = true; // Flag to track if GPX track is over water (true) or land (false)
+
+        // Check if coordinates are over water or land using Nominatim reverse geocoding
+        async function checkIfOverWater(lat, lon) {
+            try {
+                // Use Nominatim reverse geocoding API
+                const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=10`;
+                const response = await fetch(url, {
+                    headers: {
+                        'User-Agent': 'SailingTrackVisualizer/1.0'
+                    }
+                });
+
+                if (!response.ok) {
+                    console.warn('Nominatim API error, defaulting to water');
+                    return true; // Default to water if API fails
+                }
+
+                const data = await response.json();
+
+                console.log(`Checking (${lat}, ${lon}):`, data);
+
+                // If there's an error in the response, it means no land feature found - likely water
+                if (data.error) {
+                    console.log('  -> No address found, assuming water');
+                    return true;
+                }
+
+                // Check the OSM class - 'natural' water features
+                const osmClass = data.class || '';
+                const osmType = data.type || '';
+
+                // Water-related OSM classes and types
+                if (osmClass === 'natural' && ['water', 'bay', 'strait', 'sea'].includes(osmType)) {
+                    console.log(`  -> Water feature detected: ${osmClass}/${osmType}`);
+                    return true;
+                }
+
+                if (osmClass === 'waterway' || osmClass === 'water') {
+                    console.log(`  -> Water feature detected: ${osmClass}`);
+                    return true;
+                }
+
+                // Check for specific place types that indicate water
+                const waterTypes = ['sea', 'ocean', 'bay', 'strait', 'channel', 'reef'];
+                if (waterTypes.includes(osmType)) {
+                    console.log(`  -> Water type detected: ${osmType}`);
+                    return true;
+                }
+
+                // If we have detailed land features (road, building, etc.), it's definitely land
+                const address = data.address || {};
+                const hasDetailedLandFeatures = address.road || address.building ||
+                                               address.house_number || address.village ||
+                                               address.town || address.city ||
+                                               address.county || address.municipality;
+
+                if (hasDetailedLandFeatures) {
+                    console.log('  -> Land features detected');
+                    return false; // Definitely land
+                }
+
+                // If we only have country/state but no detailed features, could be over water
+                // but Nominatim returned the nearest land
+                const onlyBroadLocation = (address.country || address.state) && !hasDetailedLandFeatures;
+                if (onlyBroadLocation) {
+                    console.log('  -> Only broad location, assuming water');
+                    return true;
+                }
+
+                // Default to land if we have any address
+                console.log('  -> Has address, assuming land');
+                return false;
+
+            } catch (error) {
+                console.warn('Error checking water/land, defaulting to water:', error);
+                return true; // Default to water if check fails
+            }
+        }
+
+        // Detect if track is primarily over water or land by sampling points
+        async function detectTrackType(points) {
+            if (!points || points.length === 0) {
+                console.log('No points to check, defaulting to water');
+                return true; // Default to water
+            }
+
+            // Sample up to 3 points: start, middle, end
+            const sampleIndices = [];
+            sampleIndices.push(0); // Start
+            if (points.length > 2) {
+                sampleIndices.push(Math.floor(points.length / 2)); // Middle
+            }
+            if (points.length > 1) {
+                sampleIndices.push(points.length - 1); // End
+            }
+
+            console.log(`Sampling ${sampleIndices.length} points from ${points.length} total points`);
+
+            let waterCount = 0;
+            let landCount = 0;
+
+            // Check each sample point with a delay to respect rate limits
+            for (let i = 0; i < sampleIndices.length; i++) {
+                const index = sampleIndices[i];
+                const point = points[index];
+                console.log(`\nChecking point ${i + 1}/${sampleIndices.length} (index ${index}): [${point.lat}, ${point.lon}]`);
+
+                const isWater = await checkIfOverWater(point.lat, point.lon);
+
+                if (isWater) {
+                    waterCount++;
+                    console.log(`  ✓ Point classified as WATER (total water: ${waterCount})`);
+                } else {
+                    landCount++;
+                    console.log(`  ✓ Point classified as LAND (total land: ${landCount})`);
+                }
+
+                // Add delay between API calls to respect rate limits (1 second)
+                if (i < sampleIndices.length - 1) {
+                    console.log('  Waiting 1 second before next check...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            console.log(`\nDetection complete: ${waterCount} water, ${landCount} land`);
+            // Return true if majority is water
+            return waterCount >= landCount;
+        }
 
         // Tab switching function
         function switchTab(tabName) {
@@ -1043,9 +1184,11 @@
                 document.getElementById('data-awa').textContent = point.awa !== null ? point.awa.toFixed(1) + '°' : '--';
                 document.getElementById('data-aws').textContent = point.aws !== null ? point.aws.toFixed(2) + ' kt' : '--';
             } else if (isEstimated) {
-                // For GPX files, show estimated SOG and COG
+                // For GPX files, show estimated SOG in km/hr and COG as bearing
                 document.getElementById('data-cog').textContent = point.cog !== null ? point.cog.toFixed(1) + '° (est.)' : '--';
-                document.getElementById('data-sog').textContent = point.sog !== null ? point.sog.toFixed(2) + ' kt (est.)' : '--';
+                // Convert knots to km/hr (1 knot = 1.852 km/hr)
+                const sogKmh = point.sog !== null ? (point.sog * 1.852) : null;
+                document.getElementById('data-sog').textContent = sogKmh !== null ? sogKmh.toFixed(2) + ' km/h (est.)' : '--';
             }
         }
 
@@ -1230,6 +1373,59 @@
             }
         }
 
+        // Handle file selection from file browser (for prompt dialog)
+        async function handlePromptFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                await uploadAndLoadFiles(files);
+            }
+        }
+
+        // Handle file selection from file browser (for Home tab)
+        async function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                await uploadAndLoadFiles(files);
+            }
+        }
+
+        // Upload files and load tracks directly
+        async function uploadAndLoadFiles(files) {
+            try {
+                // Show loading message
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('loading').textContent = `Uploading and processing ${files.length} file(s)...`;
+
+                // Create FormData to upload files
+                const formData = new FormData();
+                for (let file of files) {
+                    formData.append('files', file);
+                }
+
+                // Upload files to server
+                const response = await fetch('/api/upload-files', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    // Reload the page and let initMap handle the uploaded tracks
+                    // Store the data temporarily
+                    sessionStorage.setItem('uploadedTracks', JSON.stringify(data));
+                    location.reload();
+                } else {
+                    alert('Error loading files: ' + data.message);
+                    document.getElementById('loading').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error uploading files:', error);
+                alert('Error uploading files: ' + error.message);
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+
         // Update track directory configuration from Home tab
         async function updateTrackDirectory() {
             const directoryInput = document.getElementById('track-directory');
@@ -1303,9 +1499,16 @@
                     // Update annotations list
                     updateAnnotationsList();
 
-                    console.log(`Auto-loaded ${annotations.length} annotation(s) from ${data.file}`);
+                    if (annotations.length > 0) {
+                        console.log(`Auto-loaded ${annotations.length} annotation(s) from ${data.file || 'server'}`);
+                    } else {
+                        console.log(`Annotations initialized: ${data.message || 'No annotations found, starting with empty list'}`);
+                    }
                 } else if (data.status === 'not_found') {
+                    // Legacy handling - should not be reached with new backend code
                     console.log('No annotation file found in track directory');
+                    annotations = [];
+                    updateAnnotationsList();
                 } else if (data.status === 'error') {
                     console.error('Error loading annotations:', data.message);
                 }
@@ -1326,9 +1529,23 @@
                 document.getElementById('track-directory').value = currentDirectory;
                 document.getElementById('directory-status').textContent = `Current: ${currentDirectory}`;
 
-                // Fetch track data
-                const response = await fetch('/api/tracks');
-                const data = await response.json();
+                // Check if we have uploaded tracks in sessionStorage
+                const uploadedTracksData = sessionStorage.getItem('uploadedTracks');
+                let data;
+                let isUploadedTracks = false;
+
+                if (uploadedTracksData) {
+                    // Use uploaded tracks
+                    data = JSON.parse(uploadedTracksData);
+                    isUploadedTracks = true;
+                    // Clear sessionStorage after using
+                    sessionStorage.removeItem('uploadedTracks');
+                } else {
+                    // Fetch track data from directory
+                    const response = await fetch('/api/tracks');
+                    data = await response.json();
+                }
+
                 tracks = data.tracks;
                 bounds = data.bounds;
 
@@ -1345,7 +1562,13 @@
                                 Or: C:/Users/username/Documents/tracks<br>
                                 Linux/Mac: /home/username/tracks
                             </div>
-                            <input type="text" id="prompt-directory" placeholder="Enter directory path..." value="${currentDirectory}">
+                            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                                <input type="text" id="prompt-directory" placeholder="Enter directory path..." value="${currentDirectory}" style="flex: 1;">
+                                <label for="prompt-folder-picker" style="padding: 12px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; white-space: nowrap;">
+                                    📁 Browse Files
+                                    <input type="file" id="prompt-folder-picker" multiple accept=".json,.gpx" style="display: none;" onchange="handlePromptFileSelect(event)">
+                                </label>
+                            </div>
                             <button onclick="loadTracksFromPrompt()">Load Tracks</button>
                             <p style="margin-top: 20px; font-size: 12px; color: #999;">
                                 Supported formats: JSON (export *.json) and GPX (*.gpx)
@@ -1358,7 +1581,7 @@
                 // Check if any track has sailing data
                 hasSailingData = tracks.some(track => track.has_sailing_data);
 
-                // Hide loading indicator
+                // Hide loading indicator temporarily
                 document.getElementById('loading').style.display = 'none';
 
                 // Create map centered on the tracks
@@ -1443,6 +1666,27 @@
                 allPoints.sort((a, b) => {
                     return new Date(a.utc) - new Date(b.utc);
                 });
+
+                console.log(`=== Track Detection ===`);
+                console.log(`Number of tracks: ${tracks.length}`);
+                console.log(`Has sailing data: ${hasSailingData}`);
+                console.log(`All points count: ${allPoints.length}`);
+
+                // For GPX tracks (no sailing data), detect if over water or land
+                if (!hasSailingData && allPoints.length > 0) {
+                    console.log('Starting land/water detection...');
+                    document.getElementById('loading').style.display = 'block';
+                    document.getElementById('loading').textContent = 'Detecting track type (water/land)...';
+                    isOverWater = await detectTrackType(allPoints);
+                    console.log(`=== Final Result: Track detected as ${isOverWater ? 'WATER ⛵' : 'LAND 🚶'} ===`);
+                    document.getElementById('loading').style.display = 'none';
+                } else {
+                    if (hasSailingData) {
+                        console.log('Skipping land/water detection - sailing data available (JSON files)');
+                    } else {
+                        console.log('Skipping land/water detection - no points available');
+                    }
+                }
 
                 // Calculate initial distance (at start position)
                 calculateDistanceToCurrentPosition();
@@ -1531,16 +1775,17 @@
                             { icon: awaArrowIcon }
                         ).addTo(map);
                     } else {
-                        // Create simple boat position marker for GPX files (no sailing data)
-                        const boatIcon = L.divIcon({
-                            html: '⛵',
+                        // Create position marker for GPX files (no sailing data)
+                        // Use boat icon for water, person icon for land
+                        const markerIcon = L.divIcon({
+                            html: isOverWater ? '⛵' : '🚶',
                             iconSize: [32, 32],
                             className: 'boat-marker',
                             iconAnchor: [16, 16]
                         });
                         boatMarker = L.marker(
                             [firstPoint.lat, firstPoint.lon],
-                            { icon: boatIcon }
+                            { icon: markerIcon }
                         ).addTo(map);
                     }
 
@@ -1606,8 +1851,18 @@
 
                 // No animation polyline - boat marker only to preserve original track visibility
 
-                // Auto-load annotations if available
-                await autoLoadAnnotations();
+                // Auto-load annotations only if tracks are from a directory (not uploaded files)
+                if (isUploadedTracks) {
+                    // Clear any existing annotations when using uploaded tracks
+                    annotationMarkers.forEach(marker => map.removeLayer(marker));
+                    annotationMarkers = [];
+                    annotations = [];
+                    updateAnnotationsList();
+                    console.log('Uploaded tracks detected - annotations cleared (no directory association)');
+                } else {
+                    // Load annotations from track directory
+                    await autoLoadAnnotations();
+                }
 
             } catch (error) {
                 console.error('Error loading tracks:', error);
@@ -1852,10 +2107,30 @@
 
             let photosWithGPS = 0;
             let photosProcessed = 0;
+            let photosFiltered = 0;
+
+            // Check filter setting at start
+            const filterByTime = document.getElementById('filter-photos-by-time').checked;
+            console.log(`Photo upload started. Filter by time: ${filterByTime}`);
+            console.log(`Processing ${files.length} files`);
 
             // Clear existing photo markers
             photoMarkers.forEach(marker => map.removeLayer(marker));
             photoMarkers = [];
+
+            // Get track timestamp range for filtering
+            let trackStartTime = null;
+            let trackEndTime = null;
+            if (allPoints.length > 0) {
+                const timestamps = allPoints.map(p => p.utc).filter(t => t);
+                if (timestamps.length > 0) {
+                    const times = timestamps.map(t => new Date(t)).filter(d => !isNaN(d.getTime()));
+                    if (times.length > 0) {
+                        trackStartTime = new Date(Math.min(...times.map(d => d.getTime())));
+                        trackEndTime = new Date(Math.max(...times.map(d => d.getTime())));
+                    }
+                }
+            }
 
             Array.from(files).forEach(file => {
                 if (!file.type.startsWith('image/')) return;
@@ -1879,41 +2154,81 @@
                                 const latitude = convertDMSToDD(lat[0], lat[1], lat[2], latRef);
                                 const longitude = convertDMSToDD(lon[0], lon[1], lon[2], lonRef);
 
-                                // Create camera icon for photo marker
-                                const photoIcon = L.divIcon({
-                                    html: '📷',
-                                    iconSize: [24, 24],
-                                    className: 'photo-marker',
-                                    iconAnchor: [12, 12]
-                                });
+                                console.log(`Photo ${file.name}: GPS found [${latitude}, ${longitude}]`);
 
-                                // Add marker to map - clicking marker opens full-res photo
-                                const marker = L.marker([latitude, longitude], { icon: photoIcon })
-                                    .addTo(map)
-                                    .on('click', function() {
-                                        openPhotoModal(e.target.result, file.name, dateTime);
+                                // Filter photos by track timestamp range if checkbox is enabled
+                                let includePhoto = true;
+                                const filterByTime = document.getElementById('filter-photos-by-time').checked;
+
+                                console.log(`  - Filter by time: ${filterByTime}`);
+                                console.log(`  - Has dateTime: ${!!dateTime}`);
+                                console.log(`  - Track times: ${trackStartTime} to ${trackEndTime}`);
+
+                                if (filterByTime && trackStartTime && trackEndTime && dateTime) {
+                                    const formattedDate = formatExifDate(dateTime);
+                                    const photoTime = new Date(formattedDate);
+                                    console.log(`  - Photo time: ${photoTime}`);
+                                    if (!isNaN(photoTime.getTime())) {
+                                        if (photoTime < trackStartTime || photoTime > trackEndTime) {
+                                            includePhoto = false;
+                                            photosFiltered++;
+                                            console.log(`  - FILTERED OUT (outside track time)`);
+                                        } else {
+                                            console.log(`  - INCLUDED (within track time)`);
+                                        }
+                                    }
+                                } else {
+                                    console.log(`  - INCLUDED (no filtering applied)`);
+                                }
+
+                                console.log(`  - Final decision: ${includePhoto ? 'INCLUDE' : 'EXCLUDE'}`);
+
+
+                                if (includePhoto) {
+                                    // Create camera icon for photo marker
+                                    const photoIcon = L.divIcon({
+                                        html: '📷',
+                                        iconSize: [24, 24],
+                                        className: 'photo-marker',
+                                        iconAnchor: [12, 12]
                                     });
 
-                                // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
-                                const formattedDate = formatExifDate(dateTime);
-                                const popupContent = `
-                                    <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}')">
-                                        <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
-                                        <div style="font-size: 11px; color: #666;">${file.name}</div>
-                                        ${formattedDate ? `<div style="font-size: 10px; color: #999;">${formattedDate}</div>` : ''}
-                                        <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
-                                    </div>
-                                `;
-                                marker.bindPopup(popupContent);
+                                    // Add marker to map - clicking marker opens full-res photo
+                                    const marker = L.marker([latitude, longitude], { icon: photoIcon })
+                                        .addTo(map)
+                                        .on('click', function() {
+                                            openPhotoModal(e.target.result, file.name, dateTime);
+                                        });
 
-                                photoMarkers.push(marker);
-                                photosWithGPS++;
+                                    // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
+                                    const formattedDate = formatExifDate(dateTime);
+                                    const popupContent = `
+                                        <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}')">
+                                            <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
+                                            <div style="font-size: 11px; color: #666;">${file.name}</div>
+                                            ${formattedDate ? `<div style="font-size: 10px; color: #999;">${formattedDate}</div>` : ''}
+                                            <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
+                                        </div>
+                                    `;
+                                    marker.bindPopup(popupContent);
+
+                                    photoMarkers.push(marker);
+                                    photosWithGPS++;
+                                }
                             }
 
                             // Update status after all photos processed
                             if (photosProcessed === files.length) {
-                                document.getElementById('photo-status').textContent =
-                                    `Loaded ${photosWithGPS} of ${files.length} photos with GPS data`;
+                                const filterByTime = document.getElementById('filter-photos-by-time').checked;
+                                let statusText = `Loaded ${photosWithGPS} of ${files.length} photos with GPS data`;
+                                if (filterByTime && photosFiltered > 0) {
+                                    statusText += ` (${photosFiltered} filtered - outside track time range)`;
+                                }
+                                document.getElementById('photo-status').textContent = statusText;
+
+                                // Reset file input so user can re-select the same files
+                                event.target.value = '';
+                                console.log('File input reset - you can now re-select the same photos');
                             }
                         });
                     };
