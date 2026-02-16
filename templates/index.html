@@ -318,6 +318,17 @@
             transform: scale(1.2);
         }
 
+        .video-marker {
+            font-size: 24px;
+            text-align: center;
+            cursor: pointer;
+            filter: drop-shadow(2px 2px 2px rgba(0,0,0,0.3));
+        }
+
+        .video-marker:hover {
+            transform: scale(1.2);
+        }
+
         .photo-modal {
             display: none;
             position: fixed;
@@ -339,6 +350,10 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
+        }
+
+        #modal-video {
+            background: #000;
         }
 
         .photo-modal-close {
@@ -539,10 +554,14 @@
 <body>
     <div id="loading" class="loading">Loading tracks...</div>
 
-    <!-- Photo Modal -->
+    <!-- Photo/Video Modal -->
     <div id="photo-modal" class="photo-modal">
         <span class="photo-modal-close" onclick="closePhotoModal()">&times;</span>
-        <img class="photo-modal-content" id="modal-image">
+        <img class="photo-modal-content" id="modal-image" style="display: none;">
+        <video class="photo-modal-content" id="modal-video" controls style="display: none;">
+            <source id="modal-video-source" src="" type="">
+            Your browser does not support the video tag.
+        </video>
         <div class="photo-modal-info" id="modal-info"></div>
     </div>
 
@@ -666,21 +685,21 @@
             <!-- Photo Tab -->
             <div id="photo-tab" class="tab-content">
                 <div class="photo-panel">
-                    <div class="data-panel-title">Photo Gallery</div>
+                    <div class="data-panel-title">Photo & Video Gallery</div>
                     <div style="font-size: 11px;">
                         <label for="photo-upload" style="display: block; margin-bottom: 8px; cursor: pointer; padding: 8px; background: #007bff; color: white; text-align: center; border-radius: 4px;">
-                            Select Photos
-                            <input type="file" id="photo-upload" multiple accept="image/*" style="display: none;">
+                            Select Photos & Videos
+                            <input type="file" id="photo-upload" multiple accept="image/*,video/*,.mp4,.mov,.avi,.wmv,.flv,.mkv" style="display: none;">
                         </label>
                         <div style="margin-top: 10px; padding: 8px; background: #e7f3ff; border-radius: 4px;">
                             <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 11px;">
                                 <input type="checkbox" id="filter-photos-by-time" checked style="cursor: pointer;">
-                                <span>Only show photos taken during track time</span>
+                                <span>Only show photos/videos taken during track time</span>
                             </label>
                         </div>
-                        <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos loaded</div>
+                        <div id="photo-status" style="font-size: 10px; color: #666; margin-top: 5px;">No photos or videos loaded</div>
                         <div style="margin-top: 10px; padding: 10px; background: #f8f9fa; border-radius: 4px; font-size: 10px; color: #666;">
-                            <strong>Instructions:</strong> Select photos with GPS metadata. They will appear as camera icons on the map at their GPS coordinates. Click on the icons to view full-size photos.
+                            <strong>Instructions:</strong> Select photos and videos with GPS metadata. They will appear as camera 📷 or video 🎥 icons on the map at their GPS coordinates. Click on the icons to view full-size.
                         </div>
                     </div>
                 </div>
@@ -2068,21 +2087,110 @@
             return exifDate.replace(/^(\d{4}):(\d{2}):(\d{2})/, '$1-$2-$3');
         }
 
-        // Open photo modal with full resolution image
-        function openPhotoModal(imageSrc, fileName, dateTime) {
+        // Parse timestamp from filename
+        // Supports common formats like: 20251009_154621, IMG_20251009_154621, VID-20251009-154621, etc.
+        function parseTimestampFromFilename(filename) {
+            // Remove extension
+            const nameWithoutExt = filename.replace(/\.[^/.]+$/, '');
+
+            console.log(`  Attempting to parse timestamp from filename: ${nameWithoutExt}`);
+
+            // Pattern 1: YYYYMMDD_HHMMSS (e.g., 20251009_154621)
+            let match = nameWithoutExt.match(/(\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})/);
+            if (match) {
+                const [, year, month, day, hour, min, sec] = match;
+                const dateStr = `${year}-${month}-${day}T${hour}:${min}:${sec}`;
+                console.log(`  ✅ Parsed from pattern YYYYMMDD_HHMMSS: ${dateStr}`);
+                return new Date(dateStr);
+            }
+
+            // Pattern 2: YYYY-MM-DD_HH-MM-SS or YYYY-MM-DD HH-MM-SS
+            match = nameWithoutExt.match(/(\d{4})-(\d{2})-(\d{2})[_\s-]+(\d{2})-(\d{2})-(\d{2})/);
+            if (match) {
+                const [, year, month, day, hour, min, sec] = match;
+                const dateStr = `${year}-${month}-${day}T${hour}:${min}:${sec}`;
+                console.log(`  ✅ Parsed from pattern YYYY-MM-DD_HH-MM-SS: ${dateStr}`);
+                return new Date(dateStr);
+            }
+
+            // Pattern 3: YYYYMMDD only (e.g., 20251009)
+            match = nameWithoutExt.match(/(\d{4})(\d{2})(\d{2})/);
+            if (match) {
+                const [, year, month, day] = match;
+                const dateStr = `${year}-${month}-${day}T12:00:00`;
+                console.log(`  ✅ Parsed from pattern YYYYMMDD (date only, assuming noon): ${dateStr}`);
+                return new Date(dateStr);
+            }
+
+            console.log(`  ❌ Could not parse timestamp from filename`);
+            return null;
+        }
+
+        // Extract video metadata creation date using video element
+        async function getVideoCreationDate(file) {
+            return new Promise((resolve) => {
+                const video = document.createElement('video');
+                video.preload = 'metadata';
+
+                video.onloadedmetadata = function() {
+                    // Try to get creation date from video metadata
+                    // Note: This is limited in browsers, but we can try
+                    URL.revokeObjectURL(video.src);
+
+                    // Unfortunately, browser video elements don't expose creation time directly
+                    // We'll need to rely on filename parsing or file modification time
+                    resolve(null);
+                };
+
+                video.onerror = function() {
+                    URL.revokeObjectURL(video.src);
+                    resolve(null);
+                };
+
+                video.src = URL.createObjectURL(file);
+            });
+        }
+
+        // Open photo/video modal with full resolution
+        function openPhotoModal(mediaSrc, fileName, dateTime, isVideo = false, mimeType = '') {
             const modal = document.getElementById('photo-modal');
             const modalImg = document.getElementById('modal-image');
+            const modalVideo = document.getElementById('modal-video');
+            const modalVideoSource = document.getElementById('modal-video-source');
             const modalInfo = document.getElementById('modal-info');
 
             modal.style.display = 'block';
-            modalImg.src = imageSrc;
+
+            if (isVideo) {
+                // Show video, hide image
+                modalImg.style.display = 'none';
+                modalVideo.style.display = 'block';
+                modalVideoSource.src = mediaSrc;
+                modalVideoSource.type = mimeType;
+                modalVideo.load();
+            } else {
+                // Show image, hide video
+                modalVideo.style.display = 'none';
+                modalImg.style.display = 'block';
+                modalImg.src = mediaSrc;
+            }
+
             const formattedDate = formatExifDate(dateTime);
             modalInfo.innerHTML = `<div>${fileName}</div>${formattedDate ? `<div style="font-size: 12px; margin-top: 5px;">${formattedDate}</div>` : ''}`;
         }
 
-        // Close photo modal
+        // Close photo/video modal
         function closePhotoModal() {
-            document.getElementById('photo-modal').style.display = 'none';
+            const modal = document.getElementById('photo-modal');
+            const modalVideo = document.getElementById('modal-video');
+
+            // Pause and reset video if it was playing
+            if (modalVideo.style.display !== 'none') {
+                modalVideo.pause();
+                modalVideo.currentTime = 0;
+            }
+
+            modal.style.display = 'none';
         }
 
         // Close modal when clicking outside the image
@@ -2100,21 +2208,27 @@
             }
         });
 
-        // Handle photo upload and extract GPS data
+        // Handle photo and video upload and extract GPS data
         function handlePhotoUpload(event) {
             const files = event.target.files;
             if (files.length === 0) return;
 
-            let photosWithGPS = 0;
-            let photosProcessed = 0;
+            let photosLoaded = 0;
+            let videosLoaded = 0;
+            let mediaProcessed = 0;
+            let mediaFiltered = 0;
             let photosFiltered = 0;
+            let videosFiltered = 0;
+            let videosNoMatch = 0;
+            let totalVideoFiles = 0;
+            let totalPhotoFiles = 0;
 
             // Check filter setting at start
             const filterByTime = document.getElementById('filter-photos-by-time').checked;
-            console.log(`Photo upload started. Filter by time: ${filterByTime}`);
+            console.log(`Media upload started. Filter by time: ${filterByTime}`);
             console.log(`Processing ${files.length} files`);
 
-            // Clear existing photo markers
+            // Clear existing photo/video markers
             photoMarkers.forEach(marker => map.removeLayer(marker));
             photoMarkers = [];
 
@@ -2133,108 +2247,355 @@
             }
 
             Array.from(files).forEach(file => {
-                if (!file.type.startsWith('image/')) return;
+                const isVideo = file.type.startsWith('video/');
+                const isImage = file.type.startsWith('image/');
+
+                if (!isImage && !isVideo) return;
+
+                if (isVideo) totalVideoFiles++;
+                if (isImage) totalPhotoFiles++;
 
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const img = new Image();
-                    img.src = e.target.result;
+                    if (isImage) {
+                        // Process image file
+                        const img = new Image();
+                        img.src = e.target.result;
 
-                    img.onload = function() {
-                        EXIF.getData(img, function() {
-                            const lat = EXIF.getTag(this, 'GPSLatitude');
-                            const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
-                            const lon = EXIF.getTag(this, 'GPSLongitude');
-                            const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
-                            const dateTime = EXIF.getTag(this, 'DateTime');
+                        img.onload = function() {
+                            EXIF.getData(img, function() {
+                                const lat = EXIF.getTag(this, 'GPSLatitude');
+                                const latRef = EXIF.getTag(this, 'GPSLatitudeRef');
+                                const lon = EXIF.getTag(this, 'GPSLongitude');
+                                const lonRef = EXIF.getTag(this, 'GPSLongitudeRef');
+                                const dateTime = EXIF.getTag(this, 'DateTime');
 
-                            photosProcessed++;
+                                mediaProcessed++;
 
-                            if (lat && lon && latRef && lonRef) {
-                                const latitude = convertDMSToDD(lat[0], lat[1], lat[2], latRef);
-                                const longitude = convertDMSToDD(lon[0], lon[1], lon[2], lonRef);
+                                if (lat && lon && latRef && lonRef) {
+                                    const latitude = convertDMSToDD(lat[0], lat[1], lat[2], latRef);
+                                    const longitude = convertDMSToDD(lon[0], lon[1], lon[2], lonRef);
 
-                                console.log(`Photo ${file.name}: GPS found [${latitude}, ${longitude}]`);
+                                    console.log(`Photo ${file.name}: GPS found [${latitude}, ${longitude}], DateTime: ${dateTime || 'none'}`);
 
                                 // Filter photos by track timestamp range if checkbox is enabled
                                 let includePhoto = true;
                                 const filterByTime = document.getElementById('filter-photos-by-time').checked;
 
-                                console.log(`  - Filter by time: ${filterByTime}`);
-                                console.log(`  - Has dateTime: ${!!dateTime}`);
-                                console.log(`  - Track times: ${trackStartTime} to ${trackEndTime}`);
-
                                 if (filterByTime && trackStartTime && trackEndTime && dateTime) {
                                     const formattedDate = formatExifDate(dateTime);
                                     const photoTime = new Date(formattedDate);
-                                    console.log(`  - Photo time: ${photoTime}`);
+                                    console.log(`  📅 Photo timestamp from EXIF: ${photoTime.toISOString()}`);
                                     if (!isNaN(photoTime.getTime())) {
                                         if (photoTime < trackStartTime || photoTime > trackEndTime) {
                                             includePhoto = false;
                                             photosFiltered++;
-                                            console.log(`  - FILTERED OUT (outside track time)`);
+                                            const beforeStart = photoTime < trackStartTime;
+                                            const timeDiff = beforeStart
+                                                ? Math.round((trackStartTime - photoTime) / 1000 / 60 / 60 / 24)
+                                                : Math.round((photoTime - trackEndTime) / 1000 / 60 / 60 / 24);
+                                            console.log(`  ❌ FILTERED OUT: Photo is ${beforeStart ? 'before' : 'after'} track time by ${timeDiff} days`);
                                         } else {
-                                            console.log(`  - INCLUDED (within track time)`);
+                                            console.log(`  ✅ INCLUDED (within track time)`);
                                         }
                                     }
                                 } else {
-                                    console.log(`  - INCLUDED (no filtering applied)`);
+                                    console.log(`  ✅ INCLUDED (no filtering applied)`);
                                 }
 
-                                console.log(`  - Final decision: ${includePhoto ? 'INCLUDE' : 'EXCLUDE'}`);
-
-
-                                if (includePhoto) {
-                                    // Create camera icon for photo marker
-                                    const photoIcon = L.divIcon({
-                                        html: '📷',
-                                        iconSize: [24, 24],
-                                        className: 'photo-marker',
-                                        iconAnchor: [12, 12]
-                                    });
-
-                                    // Add marker to map - clicking marker opens full-res photo
-                                    const marker = L.marker([latitude, longitude], { icon: photoIcon })
-                                        .addTo(map)
-                                        .on('click', function() {
-                                            openPhotoModal(e.target.result, file.name, dateTime);
+                                    if (includePhoto) {
+                                        // Create camera icon for photo marker
+                                        const photoIcon = L.divIcon({
+                                            html: '📷',
+                                            iconSize: [24, 24],
+                                            className: 'photo-marker',
+                                            iconAnchor: [12, 12]
                                         });
 
-                                    // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
-                                    const formattedDate = formatExifDate(dateTime);
-                                    const popupContent = `
-                                        <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}')">
-                                            <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
-                                            <div style="font-size: 11px; color: #666;">${file.name}</div>
-                                            ${formattedDate ? `<div style="font-size: 10px; color: #999;">${formattedDate}</div>` : ''}
-                                            <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
-                                        </div>
-                                    `;
-                                    marker.bindPopup(popupContent);
+                                        // Add marker to map - clicking marker opens full-res photo
+                                        const marker = L.marker([latitude, longitude], { icon: photoIcon })
+                                            .addTo(map)
+                                            .on('click', function() {
+                                                openPhotoModal(e.target.result, file.name, dateTime, false);
+                                            });
 
-                                    photoMarkers.push(marker);
-                                    photosWithGPS++;
+                                        // Create popup with photo thumbnail (clicking thumbnail also opens full-res)
+                                        const formattedDate = formatExifDate(dateTime);
+                                        const popupContent = `
+                                            <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}', false)">
+                                                <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
+                                                <div style="font-size: 11px; color: #666;">${file.name}</div>
+                                                ${formattedDate ? `<div style="font-size: 10px; color: #999;">${formattedDate}</div>` : ''}
+                                                <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
+                                            </div>
+                                        `;
+                                        marker.bindPopup(popupContent);
+
+                                        photoMarkers.push(marker);
+                                        photosLoaded++;
+                                    } else {
+                                        photosFiltered++;
+                                    }
+                                } else {
+                                    // Photo has no GPS coordinates
+                                    // Try to position by timestamp if DateTime is available
+                                    console.log(`Photo ${file.name}: No GPS data`);
+
+                                    if (dateTime && allPoints.length > 0 && trackStartTime && trackEndTime) {
+                                        const formattedDate = formatExifDate(dateTime);
+                                        const photoTime = new Date(formattedDate);
+
+                                        if (!isNaN(photoTime.getTime())) {
+                                            console.log(`  📅 Photo timestamp from EXIF: ${photoTime.toISOString()}`);
+
+                                            // Check filtering
+                                            const filterByTime = document.getElementById('filter-photos-by-time').checked;
+                                            if (filterByTime && (photoTime < trackStartTime || photoTime > trackEndTime)) {
+                                                photosFiltered++;
+                                                console.log(`  ❌ FILTERED OUT (outside track time)`);
+                                                updateMediaStatus();
+                                                return;
+                                            }
+
+                                            // Find closest track point by timestamp
+                                            let closestPoint = null;
+                                            let minTimeDiff = Infinity;
+
+                                            allPoints.forEach(point => {
+                                                if (point.utc) {
+                                                    const pointTime = new Date(point.utc);
+                                                    const timeDiff = Math.abs(photoTime - pointTime);
+                                                    if (timeDiff < minTimeDiff) {
+                                                        minTimeDiff = timeDiff;
+                                                        closestPoint = point;
+                                                    }
+                                                }
+                                            });
+
+                                            if (closestPoint && minTimeDiff < 3600000) { // Within 1 hour
+                                                console.log(`  ✅ Positioned by timestamp at [${closestPoint.lat.toFixed(6)}, ${closestPoint.lon.toFixed(6)}]`);
+
+                                                const photoIcon = L.divIcon({
+                                                    html: '📷',
+                                                    iconSize: [24, 24],
+                                                    className: 'photo-marker',
+                                                    iconAnchor: [12, 12]
+                                                });
+
+                                                const marker = L.marker([closestPoint.lat, closestPoint.lon], { icon: photoIcon })
+                                                    .addTo(map)
+                                                    .on('click', function() {
+                                                        openPhotoModal(e.target.result, file.name, dateTime, false);
+                                                    });
+
+                                                const popupContent = `
+                                                    <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${dateTime || ''}', false)">
+                                                        <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; display: block; margin-bottom: 5px;">
+                                                        <div style="font-size: 11px; color: #666;">${file.name}</div>
+                                                        <div style="font-size: 10px; color: #999;">${formattedDate}</div>
+                                                        <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to view full size</div>
+                                                    </div>
+                                                `;
+                                                marker.bindPopup(popupContent);
+
+                                                photoMarkers.push(marker);
+                                                photosLoaded++;
+                                            } else {
+                                                console.log(`  ❌ No close track point found (timestamp >1hr away)`);
+                                            }
+                                        }
+                                    } else {
+                                        console.log(`  ❌ Cannot position photo: no GPS and no timestamp/track data`);
+                                    }
                                 }
-                            }
 
-                            // Update status after all photos processed
-                            if (photosProcessed === files.length) {
-                                const filterByTime = document.getElementById('filter-photos-by-time').checked;
-                                let statusText = `Loaded ${photosWithGPS} of ${files.length} photos with GPS data`;
-                                if (filterByTime && photosFiltered > 0) {
-                                    statusText += ` (${photosFiltered} filtered - outside track time range)`;
+                                updateMediaStatus();
+                            });
+                        };
+                    } else if (isVideo) {
+                        // Process video file - try to extract metadata
+                        // Priority: 1) Filename timestamp, 2) Video metadata, 3) File modification time
+                        mediaProcessed++;
+
+                        console.log(`\n=== Processing Video: ${file.name} ===`);
+                        console.log(`  File size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+                        console.log(`  File type: ${file.type}`);
+
+                        // Try to parse timestamp from filename first
+                        let videoDate = parseTimestampFromFilename(file.name);
+
+                        if (!videoDate) {
+                            // Fall back to file modification time
+                            videoDate = new Date(file.lastModified);
+                            console.log(`  ⚠️ Using file modification timestamp (fallback): ${videoDate.toISOString()}`);
+                        }
+
+                        const fileDate = videoDate;
+                        console.log(`  📅 Using timestamp: ${fileDate.toISOString()}`);
+
+                        // Try to find a track position close to the video timestamp
+                        let videoPosition = null;
+                        if (allPoints.length === 0) {
+                            console.log(`  ❌ ERROR: No track data loaded! Load track files first.`);
+                            videosNoMatch++;
+                            updateMediaStatus();
+                            return;
+                        }
+
+                        if (!trackStartTime || !trackEndTime) {
+                            console.log(`  ❌ ERROR: Track has no timestamps!`);
+                            videosNoMatch++;
+                            updateMediaStatus();
+                            return;
+                        }
+
+                        console.log(`  Track time range: ${trackStartTime.toISOString()} to ${trackEndTime.toISOString()}`);
+                        console.log(`  Filter by time enabled: ${filterByTime}`);
+
+                        // Check if video timestamp is within track time range
+                        if (filterByTime && (fileDate < trackStartTime || fileDate > trackEndTime)) {
+                            const beforeStart = fileDate < trackStartTime;
+                            const timeDiff = beforeStart
+                                ? Math.round((trackStartTime - fileDate) / 1000 / 60 / 60 / 24)
+                                : Math.round((fileDate - trackEndTime) / 1000 / 60 / 60 / 24);
+                            videosFiltered++;
+                            console.log(`  ❌ FILTERED OUT: Video is ${beforeStart ? 'before' : 'after'} track time by ${timeDiff} days`);
+                            console.log(`  💡 TIP: Uncheck "Only show photos/videos taken during track time" to load all videos`);
+                            updateMediaStatus();
+                            return;
+                        }
+
+                        // Find closest track point by timestamp
+                        let closestPoint = null;
+                        let minTimeDiff = Infinity;
+
+                        allPoints.forEach(point => {
+                            if (point.utc) {
+                                const pointTime = new Date(point.utc);
+                                const timeDiff = Math.abs(fileDate - pointTime);
+                                if (timeDiff < minTimeDiff) {
+                                    minTimeDiff = timeDiff;
+                                    closestPoint = point;
                                 }
-                                document.getElementById('photo-status').textContent = statusText;
-
-                                // Reset file input so user can re-select the same files
-                                event.target.value = '';
-                                console.log('File input reset - you can now re-select the same photos');
                             }
                         });
-                    };
+
+                        if (closestPoint) {
+                            const hoursDiff = minTimeDiff / 1000 / 60 / 60;
+                            const daysDiff = minTimeDiff / 1000 / 60 / 60 / 24;
+
+                            if (minTimeDiff < 3600000) { // Within 1 hour
+                                videoPosition = { lat: closestPoint.lat, lon: closestPoint.lon };
+                                console.log(`  ✅ SUCCESS: Matched to track position [${videoPosition.lat.toFixed(6)}, ${videoPosition.lon.toFixed(6)}]`);
+                                console.log(`  Time difference: ${Math.round(minTimeDiff/1000)} seconds (${hoursDiff.toFixed(1)} hours)`);
+                            } else {
+                                console.log(`  ❌ NO MATCH: Closest track point is ${hoursDiff.toFixed(1)} hours away (${daysDiff.toFixed(1)} days)`);
+                                console.log(`  Current limit: 1 hour. Video timestamp: ${fileDate.toISOString()}`);
+                                console.log(`  Closest track point: ${new Date(closestPoint.utc).toISOString()}`);
+                                console.log(`  💡 TIP: Video file timestamp may not match recording time. Check file properties.`);
+                                videosNoMatch++;
+                                updateMediaStatus();
+                                return;
+                            }
+                        } else {
+                            console.log(`  ❌ ERROR: No track points with timestamps found`);
+                            videosNoMatch++;
+                            updateMediaStatus();
+                            return;
+                        }
+
+                        if (videoPosition) {
+                            // Create video icon for marker
+                            const videoIcon = L.divIcon({
+                                html: '🎥',
+                                iconSize: [24, 24],
+                                className: 'video-marker',
+                                iconAnchor: [12, 12]
+                            });
+
+                            // Add marker to map - clicking marker opens video player
+                            const marker = L.marker([videoPosition.lat, videoPosition.lon], { icon: videoIcon })
+                                .addTo(map)
+                                .on('click', function() {
+                                    openPhotoModal(e.target.result, file.name, fileDate.toISOString(), true, file.type);
+                                });
+
+                            // Create popup with video thumbnail
+                            const formattedDate = fileDate.toISOString().replace('T', ' ').substring(0, 19);
+                            const popupContent = `
+                                <div style="text-align: center; cursor: pointer;" onclick="openPhotoModal('${e.target.result}', '${file.name}', '${fileDate.toISOString()}', true, '${file.type}')">
+                                    <div style="max-width: 200px; max-height: 200px; display: flex; align-items: center; justify-content: center; background: #000; margin-bottom: 5px;">
+                                        <div style="font-size: 48px;">🎥</div>
+                                    </div>
+                                    <div style="font-size: 11px; color: #666;">${file.name}</div>
+                                    <div style="font-size: 10px; color: #999;">${formattedDate}</div>
+                                    <div style="font-size: 9px; color: #007bff; margin-top: 3px;">Click to play video</div>
+                                </div>
+                            `;
+                            marker.bindPopup(popupContent);
+
+                            photoMarkers.push(marker);
+                            videosLoaded++;
+                        }
+
+                        updateMediaStatus();
+                    }
                 };
                 reader.readAsDataURL(file);
             });
+
+            // Helper function to update status display
+            function updateMediaStatus() {
+                if (mediaProcessed === files.length) {
+                    const filterByTime = document.getElementById('filter-photos-by-time').checked;
+                    const totalLoaded = photosLoaded + videosLoaded;
+                    const totalFiltered = photosFiltered + videosFiltered;
+
+                    let statusParts = [];
+
+                    // Main count
+                    if (photosLoaded > 0 && videosLoaded > 0) {
+                        statusParts.push(`Loaded ${photosLoaded} photo${photosLoaded !== 1 ? 's' : ''} and ${videosLoaded} video${videosLoaded !== 1 ? 's' : ''}`);
+                    } else if (photosLoaded > 0) {
+                        statusParts.push(`Loaded ${photosLoaded} photo${photosLoaded !== 1 ? 's' : ''}`);
+                    } else if (videosLoaded > 0) {
+                        statusParts.push(`Loaded ${videosLoaded} video${videosLoaded !== 1 ? 's' : ''}`);
+                    } else {
+                        statusParts.push(`No photos or videos loaded`);
+                    }
+
+                    // Filtering info
+                    if (filterByTime && totalFiltered > 0) {
+                        let filterDetails = [];
+                        if (photosFiltered > 0) filterDetails.push(`${photosFiltered} photo${photosFiltered !== 1 ? 's' : ''}`);
+                        if (videosFiltered > 0) filterDetails.push(`${videosFiltered} video${videosFiltered !== 1 ? 's' : ''}`);
+                        statusParts.push(`(${filterDetails.join(', ')} filtered - outside track time)`);
+                    }
+
+                    // Videos that didn't match
+                    if (videosNoMatch > 0) {
+                        statusParts.push(`(${videosNoMatch} video${videosNoMatch !== 1 ? 's' : ''} skipped - timestamp >1hr from track)`);
+                    }
+
+                    document.getElementById('photo-status').textContent = statusParts.join(' ');
+
+                    // Console summary
+                    console.log('\n=== MEDIA LOADING SUMMARY ===');
+                    console.log(`Total files: ${files.length} (${totalPhotoFiles} photos, ${totalVideoFiles} videos)`);
+                    console.log(`Loaded: ${totalLoaded} (${photosLoaded} photos, ${videosLoaded} videos)`);
+                    if (totalFiltered > 0) {
+                        console.log(`Filtered: ${totalFiltered} (${photosFiltered} photos, ${videosFiltered} videos) - outside track time range`);
+                    }
+                    if (videosNoMatch > 0) {
+                        console.log(`Not matched: ${videosNoMatch} videos - timestamp more than 1 hour from any track point`);
+                        console.log(`💡 Check browser console above for details on each video`);
+                    }
+                    console.log('============================\n');
+
+                    // Reset file input so user can re-select the same files
+                    event.target.value = '';
+                }
+            }
         }
 
         // Add event listener for photo upload

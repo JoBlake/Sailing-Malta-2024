@@ -7,6 +7,10 @@ import gpxpy
 
 app = Flask(__name__)
 
+# Configuration
+app.config['MAX_CONTENT_LENGTH'] = 500 * 1024 * 1024  # 500MB max upload size
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+
 # Configuration file for storing user preferences
 CONFIG_FILE = 'app_config.json'
 
@@ -436,4 +440,9 @@ def upload_files():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    import os
+    # Use environment variable for debug mode (default to False for production)
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    port = int(os.environ.get('PORT', 5001))
+
+    app.run(debug=debug_mode, host='0.0.0.0', port=port)

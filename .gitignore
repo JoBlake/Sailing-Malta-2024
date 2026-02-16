@@ -32,3 +32,17 @@ uv.lock
 
 # App configuration
 app_config.json
+
+# Environment variables (for production)
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+
+# User data (optional - uncomment if you don't want to commit your tracks)
+# sailing-annotations.json
+# export*.json
+# *.gpx
+# Pictures/

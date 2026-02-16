@@ -33,12 +33,9 @@ Sophisticated code user
     * on the home tab display the values for date/time, lat, lon, cog as a bearing and sog as speed in km/hr. Add next to cog and sog (est.)
 * On the home tab add a slider to the tab to move the boat's position along the track
 * When moving the slider show the timestamp
-* On the Photo tab 
-    * add a button to select a file directory with photos
-    * add a button to select whether to only load pictures taken between the start and end timestamp in the tracking data
-    * if the button is not selected load all pictures chosen
-* display on the map a small icon corresponding to the pictures gps coordinate in the location metadata
-* Display a large scale photo when the icon is clicked on. but keep the tab on the right visible
+* On the Photo tab add a button to select a file directory with photos and videos
+* display on the map a small icon corresponding to the picture's and video's timstamp coincidence with the track's timestamp
+* Display a large scale photo or video when the icon is clicked on. but keep the tab on the right visible
 * On the Annotation tab allow the user to enter text to annotate the map at the current position along the track
 * Display on the map a small icon identifying the position which was annotated
 * Add to the Annotation tab two buttons: one to save all annotation and one to load annotations. 

@@ -68,14 +68,31 @@ The application features a resizable three-tab interface on the right side:
 - **Position Control** slider to manually navigate through the track
 
 #### Photo Tab
-- Upload photos with GPS metadata
-- **Optional Timestamp Filtering**: Checkbox to filter photos by track time range
-  - When enabled: Only photos taken between the start and end timestamps of the track data are displayed
-  - When disabled: All photos with GPS metadata are shown regardless of timestamp
-- Photos displayed as camera icons at their GPS coordinates on the map
-- Click camera icons to view full-size photos
-- Photo popups show filename and timestamp
-- Status shows how many photos were filtered out when filtering is enabled
+- Upload photos and videos with GPS/timestamp metadata
+- **Optional Timestamp Filtering**: Checkbox to filter media by track time range
+  - When enabled: Only photos/videos taken during the track time are displayed
+  - When disabled: All media with GPS/timestamp metadata is shown
+- **Photos**: Intelligent positioning with multiple strategies
+  - **Primary**: GPS coordinates from EXIF data (most accurate)
+  - **Fallback**: Timestamp matching when GPS is not available
+  - Timestamp extracted from EXIF DateTime field (actual photo creation time)
+  - Photos without GPS are positioned at the nearest track point by timestamp (within 1 hour)
+- **Videos**: Intelligent timestamp extraction and positioning
+  - **Priority 1**: Parse timestamp from filename (e.g., `20251009_154621.mp4` → Oct 9, 2025 15:46:21)
+    - Supports formats: `YYYYMMDD_HHMMSS`, `YYYY-MM-DD_HH-MM-SS`, and variations
+  - **Priority 2**: File modification timestamp (fallback)
+  - Videos positioned at nearest track point by timestamp (within 1 hour)
+  - Supports: MP4, MOV, AVI, WMV, FLV, MKV and other common video formats
+- Click icons to view full-size photos or play videos
+- Media popups show filename and timestamp
+- **Status Display**: Detailed loading feedback
+  - Example: "Loaded 5 photos and 2 videos"
+  - Shows filtered counts: "Loaded 3 photos and 1 video (2 photos, 1 video filtered - outside track time)"
+  - Shows timestamp matching failures: "Loaded 2 videos (1 video skipped - timestamp >1hr from track)"
+- **Console Logging**: Detailed debugging information in browser console
+  - Shows timestamp extraction method for each file
+  - Displays time differences when matching to track points
+  - Helpful tips when files can't be positioned
 
 #### Annotation Tab
 - Add text annotations at any track position
@@ -290,6 +307,17 @@ Claude-sailing2024/
 - **No tracks visible**: Check that JSON or GPX files are in the correct format and location
 - **Animation doesn't start**: Verify that your track files contain valid latitude/longitude coordinates
 - **No arrows displayed**: Arrows are only shown for JSON files with sailing data, not for GPX files
+
+## Deploying to the Internet
+
+Want to access your app from anywhere? See **[DEPLOYMENT.md](DEPLOYMENT.md)** for detailed instructions on how to deploy this app to the internet.
+
+**Quick Options:**
+- **Render** (Free, easiest) - 5 minute setup
+- **Railway** ($5/mo) - Better performance
+- **Your own server** - Full control
+
+See the deployment guide for step-by-step instructions!
 
 ## License
 
