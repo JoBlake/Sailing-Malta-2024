@@ -360,4 +360,3 @@ See the deployment guide for step-by-step instructions!
 ## License
 
 This project is for personal use.
-"# TravelDiary" 
