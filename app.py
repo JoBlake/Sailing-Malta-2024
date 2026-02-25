@@ -14,6 +14,65 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 # Configuration file for storing user preferences
 CONFIG_FILE = 'app_config.json'
 
+def init_app():
+    """Initialize application on startup"""
+    print("\n" + "="*60)
+    print("🚢 Sailing Track Visualizer - Initializing...")
+    print("="*60)
+
+    # 1. Ensure config file exists
+    if not os.path.exists(CONFIG_FILE):
+        print(f"📝 Creating configuration file: {CONFIG_FILE}")
+        default_config = {'track_directory': '.'}
+        save_config(default_config)
+        print(f"   ✓ Config initialized with default directory: '.'")
+    else:
+        config = load_config()
+        track_dir = config.get('track_directory', '.')
+        print(f"📂 Track directory configured: {track_dir}")
+
+        # Check if directory exists
+        if os.path.exists(track_dir) and os.path.isdir(track_dir):
+            # Count track files
+            json_pattern = os.path.join(track_dir.replace('/', os.sep), "export *.json")
+            gpx_pattern = os.path.join(track_dir.replace('/', os.sep), "*.gpx")
+            json_files = glob.glob(json_pattern)
+            gpx_files = glob.glob(gpx_pattern)
+            total_files = len(json_files) + len(gpx_files)
+
+            if total_files > 0:
+                print(f"   ✓ Found {len(json_files)} JSON file(s) and {len(gpx_files)} GPX file(s)")
+            else:
+                print(f"   ⚠ No track files found in directory")
+        elif track_dir != '.':
+            print(f"   ⚠ Warning: Directory '{track_dir}' does not exist")
+
+    # 2. Check for annotations file
+    annotation_file = os.path.join(config.get('track_directory', '.'), 'sailing-annotations.json')
+    if os.path.exists(annotation_file):
+        try:
+            with open(annotation_file, 'r') as f:
+                annotations = json.load(f)
+                print(f"📝 Found {len(annotations)} annotation(s) in {annotation_file}")
+        except:
+            print(f"   ⚠ Annotation file exists but could not be read")
+
+    # 3. Check maximum upload size
+    max_size_mb = app.config['MAX_CONTENT_LENGTH'] / (1024 * 1024)
+    print(f"📤 Maximum upload size: {int(max_size_mb)} MB")
+
+    # 4. Display configuration
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    port = int(os.environ.get('PORT', 5001))
+    print(f"🔧 Debug mode: {'Enabled' if debug_mode else 'Disabled'}")
+    print(f"🌐 Port: {port}")
+
+    print("="*60)
+    print("✅ Initialization complete!")
+    print("="*60 + "\n")
+
+    sys.stdout.flush()
+
 def load_config():
     """Load configuration from file"""
     if os.path.exists(CONFIG_FILE):
@@ -314,6 +373,16 @@ def save_annotations():
             'message': str(e)
         }), 500
 
+@app.route('/api/health')
+def health_check():
+    """Health check endpoint for monitoring"""
+    config = load_config()
+    return jsonify({
+        'status': 'healthy',
+        'track_directory': config.get('track_directory', '.'),
+        'config_file': CONFIG_FILE
+    })
+
 @app.route('/api/upload-files', methods=['POST'])
 def upload_files():
     """API endpoint to process uploaded track files"""
@@ -439,10 +508,28 @@ def upload_files():
             'message': str(e)
         }), 500
 
+# Initialize on module import (for production servers like Gunicorn)
+# But suppress output when not running directly
+if __name__ != '__main__':
+    # Production mode - minimal output
+    try:
+        # Ensure config exists
+        if not os.path.exists(CONFIG_FILE):
+            default_config = {'track_directory': '.'}
+            save_config(default_config)
+    except Exception as e:
+        print(f"Warning: Could not initialize config: {e}")
+
 if __name__ == '__main__':
-    import os
+    # Initialize application with full output
+    init_app()
+
     # Use environment variable for debug mode (default to False for production)
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     port = int(os.environ.get('PORT', 5001))
+
+    print(f"🚀 Starting server at http://0.0.0.0:{port}")
+    print(f"   Access locally at: http://localhost:{port}")
+    print(f"   Access on network at: http://YOUR-IP-ADDRESS:{port}\n")
 
     app.run(debug=debug_mode, host='0.0.0.0', port=port)

@@ -2372,8 +2372,10 @@
                                                 }
                                             });
 
-                                            if (closestPoint && minTimeDiff < 3600000) { // Within 1 hour
-                                                console.log(`  ✅ Positioned by timestamp at [${closestPoint.lat.toFixed(6)}, ${closestPoint.lon.toFixed(6)}]`);
+                                            // Use 6-hour window to handle timezone differences
+                                            if (closestPoint && minTimeDiff < 6 * 60 * 60 * 1000) { // Within 6 hours
+                                                const minutesDiff = Math.round(minTimeDiff / 1000 / 60);
+                                                console.log(`  ✅ Positioned by timestamp at [${closestPoint.lat.toFixed(6)}, ${closestPoint.lon.toFixed(6)}] (${minutesDiff} min difference)`);
 
                                                 const photoIcon = L.divIcon({
                                                     html: '📷',
@@ -2401,7 +2403,8 @@
                                                 photoMarkers.push(marker);
                                                 photosLoaded++;
                                             } else {
-                                                console.log(`  ❌ No close track point found (timestamp >1hr away)`);
+                                                const hoursDiff = minTimeDiff / 1000 / 60 / 60;
+                                                console.log(`  ❌ No close track point found (timestamp ${hoursDiff.toFixed(1)} hours away, limit: 6 hours)`);
                                             }
                                         }
                                     } else {
@@ -2449,7 +2452,10 @@
                             return;
                         }
 
-                        console.log(`  Track time range: ${trackStartTime.toISOString()} to ${trackEndTime.toISOString()}`);
+                        console.log(`  Track time range (UTC): ${trackStartTime.toISOString()} to ${trackEndTime.toISOString()}`);
+                        console.log(`  Track time range (local): ${trackStartTime.toLocaleString()} to ${trackEndTime.toLocaleString()}`);
+                        console.log(`  Video timestamp (local): ${fileDate.toLocaleString()}`);
+                        console.log(`  Video timestamp (UTC): ${fileDate.toISOString()}`);
                         console.log(`  Filter by time enabled: ${filterByTime}`);
 
                         // Check if video timestamp is within track time range
@@ -2483,16 +2489,24 @@
                         if (closestPoint) {
                             const hoursDiff = minTimeDiff / 1000 / 60 / 60;
                             const daysDiff = minTimeDiff / 1000 / 60 / 60 / 24;
+                            const minutesDiff = minTimeDiff / 1000 / 60;
 
-                            if (minTimeDiff < 3600000) { // Within 1 hour
+                            // Use 6-hour window to handle timezone mismatches (video filename may be in local time,
+                            // track may be in UTC, and user's computer timezone may differ from recording location)
+                            const MATCH_WINDOW_MS = 6 * 60 * 60 * 1000; // 6 hours
+
+                            if (minTimeDiff < MATCH_WINDOW_MS) {
                                 videoPosition = { lat: closestPoint.lat, lon: closestPoint.lon };
                                 console.log(`  ✅ SUCCESS: Matched to track position [${videoPosition.lat.toFixed(6)}, ${videoPosition.lon.toFixed(6)}]`);
-                                console.log(`  Time difference: ${Math.round(minTimeDiff/1000)} seconds (${hoursDiff.toFixed(1)} hours)`);
+                                console.log(`  Time difference: ${Math.round(minutesDiff)} minutes (${hoursDiff.toFixed(2)} hours)`);
+                                console.log(`  Closest track point: ${new Date(closestPoint.utc).toLocaleString()}`);
                             } else {
                                 console.log(`  ❌ NO MATCH: Closest track point is ${hoursDiff.toFixed(1)} hours away (${daysDiff.toFixed(1)} days)`);
-                                console.log(`  Current limit: 1 hour. Video timestamp: ${fileDate.toISOString()}`);
-                                console.log(`  Closest track point: ${new Date(closestPoint.utc).toISOString()}`);
-                                console.log(`  💡 TIP: Video file timestamp may not match recording time. Check file properties.`);
+                                console.log(`  Current limit: 6 hours. Video timestamp: ${fileDate.toISOString()}`);
+                                console.log(`  Closest track point (UTC): ${new Date(closestPoint.utc).toISOString()}`);
+                                console.log(`  Closest track point (local): ${new Date(closestPoint.utc).toLocaleString()}`);
+                                console.log(`  💡 TIMEZONE TIP: Video filename timestamp (${fileDate.toLocaleString()}) is interpreted in your computer's timezone.`);
+                                console.log(`  💡 If video was recorded in a different timezone, times may not match. Mismatch: ${Math.round(hoursDiff * 10) / 10} hours`);
                                 videosNoMatch++;
                                 updateMediaStatus();
                                 return;
@@ -2574,7 +2588,7 @@
 
                     // Videos that didn't match
                     if (videosNoMatch > 0) {
-                        statusParts.push(`(${videosNoMatch} video${videosNoMatch !== 1 ? 's' : ''} skipped - timestamp >1hr from track)`);
+                        statusParts.push(`(${videosNoMatch} video${videosNoMatch !== 1 ? 's' : ''} skipped - timestamp >6hrs from track)`);
                     }
 
                     document.getElementById('photo-status').textContent = statusParts.join(' ');

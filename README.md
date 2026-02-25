@@ -76,23 +76,25 @@ The application features a resizable three-tab interface on the right side:
   - **Primary**: GPS coordinates from EXIF data (most accurate)
   - **Fallback**: Timestamp matching when GPS is not available
   - Timestamp extracted from EXIF DateTime field (actual photo creation time)
-  - Photos without GPS are positioned at the nearest track point by timestamp (within 1 hour)
+  - Photos without GPS are positioned at the nearest track point by timestamp (within 6 hours)
 - **Videos**: Intelligent timestamp extraction and positioning
   - **Priority 1**: Parse timestamp from filename (e.g., `20251009_154621.mp4` → Oct 9, 2025 15:46:21)
     - Supports formats: `YYYYMMDD_HHMMSS`, `YYYY-MM-DD_HH-MM-SS`, and variations
   - **Priority 2**: File modification timestamp (fallback)
-  - Videos positioned at nearest track point by timestamp (within 1 hour)
+  - Videos positioned at nearest track point by timestamp (within 6 hours)
+  - **Timezone Handling**: 6-hour matching window accommodates timezone differences between recording location and computer timezone
   - Supports: MP4, MOV, AVI, WMV, FLV, MKV and other common video formats
 - Click icons to view full-size photos or play videos
 - Media popups show filename and timestamp
 - **Status Display**: Detailed loading feedback
   - Example: "Loaded 5 photos and 2 videos"
   - Shows filtered counts: "Loaded 3 photos and 1 video (2 photos, 1 video filtered - outside track time)"
-  - Shows timestamp matching failures: "Loaded 2 videos (1 video skipped - timestamp >1hr from track)"
+  - Shows timestamp matching failures: "Loaded 2 videos (1 video skipped - timestamp >6hrs from track)"
 - **Console Logging**: Detailed debugging information in browser console
   - Shows timestamp extraction method for each file
   - Displays time differences when matching to track points
-  - Helpful tips when files can't be positioned
+  - Shows both UTC and local time interpretations
+  - Helpful timezone tips when files can't be positioned
 
 #### Annotation Tab
 - Add text annotations at any track position
@@ -150,6 +152,12 @@ The application features a resizable three-tab interface on the right side:
    ```bash
    uv run python app.py
    ```
+
+   **On startup, the app will:**
+   - Initialize configuration file if it doesn't exist
+   - Scan the track directory and count available files
+   - Check for existing annotations
+   - Display initialization status and configuration
 
    Alternative: If you prefer to activate the virtual environment manually:
    ```bash
@@ -301,12 +309,42 @@ Claude-sailing2024/
 - **File Parsing**: gpxpy for GPX file support
 - **Package Management**: uv
 
+## API Endpoints
+
+The application provides several API endpoints:
+
+- `GET /` - Main application interface
+- `GET /api/tracks` - Returns all track data from configured directory
+- `GET /api/config` - Get current configuration
+- `POST /api/config` - Update configuration
+- `GET /api/annotations` - Get all annotations
+- `POST /api/annotations` - Save annotations
+- `POST /api/upload-files` - Upload track files directly
+- `GET /api/health` - Health check endpoint (returns status and configuration)
+
+### Health Check
+
+Use the health check endpoint to verify the app is running:
+```bash
+curl http://localhost:5001/api/health
+```
+
+Response:
+```json
+{
+  "status": "healthy",
+  "track_directory": ".",
+  "config_file": "app_config.json"
+}
+```
+
 ## Troubleshooting
 
 - **Map doesn't load**: Ensure you have an internet connection (required for OpenStreetMap tiles)
 - **No tracks visible**: Check that JSON or GPX files are in the correct format and location
 - **Animation doesn't start**: Verify that your track files contain valid latitude/longitude coordinates
 - **No arrows displayed**: Arrows are only shown for JSON files with sailing data, not for GPX files
+- **Check initialization**: Look at the startup output to see if files were detected correctly
 
 ## Deploying to the Internet
 
