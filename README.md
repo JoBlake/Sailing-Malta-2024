@@ -4,6 +4,12 @@ A Flask web application that visualizes sailing GPS tracks from JSON and GPX fil
 
 ## Features
 
+### Application Behavior
+- **Fresh Start on Load**: Every time the app starts or reloads, all previously loaded tracks, photos, and videos are cleared
+  - Ensures a clean state on each session
+  - Tracks are loaded fresh from the configured directory
+  - Prevents stale data from persisting across sessions
+
 ### Map Display
 - Displays multiple sailing tracks on an interactive OpenStreetMap
 - Supports both JSON files (with full sailing data) and GPX files (basic GPS tracks)
@@ -154,10 +160,12 @@ The application features a resizable three-tab interface on the right side:
    ```
 
    **On startup, the app will:**
+   - **Clear all previously loaded data** (tracks, photos, videos from sessionStorage)
    - Initialize configuration file if it doesn't exist
    - Scan the track directory and count available files
    - Check for existing annotations
    - Display initialization status and configuration
+   - Load fresh track data from the configured directory
 
    Alternative: If you prefer to activate the virtual environment manually:
    ```bash

@@ -56,6 +56,6 @@ Sophisticated code user
 * Create a readme with usage instructions
 
 ## Update
-
+* On starting clear all loaded tracks, photos and videos and do not display any map or track, but prompt user to input tracks data
 
 

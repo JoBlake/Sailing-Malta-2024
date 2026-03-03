@@ -1383,6 +1383,9 @@
                 // Show loading message
                 document.getElementById('loading').innerHTML = '<div style="padding: 40px; text-align: center;"><h2>Loading tracks...</h2><p>Please wait...</p></div>';
 
+                // Set flag to indicate user wants to load tracks (before clearing sessionStorage on reload)
+                sessionStorage.setItem('shouldLoadTracks', 'true');
+
                 // Reload the page to refresh everything
                 location.reload();
 
@@ -1539,41 +1542,62 @@
         // Initialize the map
         async function initMap() {
             try {
+                // Check if user explicitly requested to load tracks (before clearing)
+                const shouldLoadTracks = sessionStorage.getItem('shouldLoadTracks') === 'true';
+
+                // ✨ SPEC REQUIREMENT: Clear all previously loaded data on startup
+                console.log('Clearing all previously loaded tracks, photos, and videos on startup...');
+                sessionStorage.clear();
+
+                // Reset photo and video markers if they exist
+                if (photoMarkers && photoMarkers.length > 0) {
+                    photoMarkers.forEach(marker => {
+                        if (map) map.removeLayer(marker);
+                    });
+                    photoMarkers = [];
+                }
+
+                // Reset annotation markers if they exist
+                if (annotationMarkers && annotationMarkers.length > 0) {
+                    annotationMarkers.forEach(marker => {
+                        if (map) map.removeLayer(marker);
+                    });
+                    annotationMarkers = [];
+                }
+
+                // Reset UI elements
+                const photoStatusEl = document.getElementById('photo-status');
+                if (photoStatusEl) {
+                    photoStatusEl.textContent = 'No photos or videos loaded';
+                }
+
+                // Reset file input
+                const photoUploadEl = document.getElementById('photo-upload');
+                if (photoUploadEl) {
+                    photoUploadEl.value = '';
+                }
+
+                console.log('All previous data cleared');
+
                 // Load current configuration
                 const configResponse = await fetch('/api/config');
                 const config = await configResponse.json();
                 const currentDirectory = config.track_directory || '.';
 
-                // Update directory input and status
+                // Update directory input and status in Home tab
                 document.getElementById('track-directory').value = currentDirectory;
                 document.getElementById('directory-status').textContent = `Current: ${currentDirectory}`;
 
-                // Check if we have uploaded tracks in sessionStorage
-                const uploadedTracksData = sessionStorage.getItem('uploadedTracks');
-                let data;
-                let isUploadedTracks = false;
+                // ✨ SPEC REQUIREMENT: Don't auto-load tracks unless user explicitly requested it
+                if (!shouldLoadTracks) {
+                    // Show prompt dialog for user to load tracks
+                    tracks = [];
+                    bounds = null;
 
-                if (uploadedTracksData) {
-                    // Use uploaded tracks
-                    data = JSON.parse(uploadedTracksData);
-                    isUploadedTracks = true;
-                    // Clear sessionStorage after using
-                    sessionStorage.removeItem('uploadedTracks');
-                } else {
-                    // Fetch track data from directory
-                    const response = await fetch('/api/tracks');
-                    data = await response.json();
-                }
-
-                tracks = data.tracks;
-                bounds = data.bounds;
-
-                // Check if we have any tracks
-                if (tracks.length === 0) {
                     document.getElementById('loading').innerHTML = `
                         <div class="prompt-dialog">
-                            <h2>📂 Welcome to Sailing Track Visualizer</h2>
-                            <p>To get started, please enter the location of your tracking files.</p>
+                            <h2>Welcome to Sailing Track Visualizer</h2>
+                            <p>To get started, please enter the location of your tracking files or browse to select files.</p>
                             <div class="example">
                                 <strong>Examples:</strong><br>
                                 Current directory: .<br>
@@ -1584,11 +1608,49 @@
                             <div style="display: flex; gap: 10px; margin: 15px 0;">
                                 <input type="text" id="prompt-directory" placeholder="Enter directory path..." value="${currentDirectory}" style="flex: 1;">
                                 <label for="prompt-folder-picker" style="padding: 12px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; white-space: nowrap;">
-                                    📁 Browse Files
+                                    Browse Files
                                     <input type="file" id="prompt-folder-picker" multiple accept=".json,.gpx" style="display: none;" onchange="handlePromptFileSelect(event)">
                                 </label>
                             </div>
-                            <button onclick="loadTracksFromPrompt()">Load Tracks</button>
+                            <button onclick="loadTracksFromPrompt()">Load Tracks from Directory</button>
+                            <p style="margin-top: 20px; font-size: 12px; color: #999;">
+                                Supported formats: JSON (export *.json) and GPX (*.gpx)
+                            </p>
+                        </div>
+                    `;
+                    return; // Don't initialize the map until user loads tracks
+                }
+
+                // User explicitly requested to load tracks - fetch them now
+                console.log('User requested to load tracks, fetching...');
+                const response = await fetch('/api/tracks');
+                const data = await response.json();
+
+                tracks = data.tracks;
+                bounds = data.bounds;
+
+                // Check if we have any tracks
+                if (tracks.length === 0) {
+                    document.getElementById('loading').innerHTML = `
+                        <div class="prompt-dialog">
+                            <h2>No Tracks Found</h2>
+                            <p style="color: #e74c3c;">No track files were found in the directory: <strong>${currentDirectory}</strong></p>
+                            <p>Please check the directory path and try again, or browse to select files.</p>
+                            <div class="example">
+                                <strong>Examples:</strong><br>
+                                Current directory: .<br>
+                                Windows: C:\\Users\\username\\Documents\\tracks<br>
+                                Or: C:/Users/username/Documents/tracks<br>
+                                Linux/Mac: /home/username/tracks
+                            </div>
+                            <div style="display: flex; gap: 10px; margin: 15px 0;">
+                                <input type="text" id="prompt-directory" placeholder="Enter directory path..." value="${currentDirectory}" style="flex: 1;">
+                                <label for="prompt-folder-picker" style="padding: 12px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; white-space: nowrap;">
+                                    Browse Files
+                                    <input type="file" id="prompt-folder-picker" multiple accept=".json,.gpx" style="display: none;" onchange="handlePromptFileSelect(event)">
+                                </label>
+                            </div>
+                            <button onclick="loadTracksFromPrompt()">Load Tracks from Directory</button>
                             <p style="margin-top: 20px; font-size: 12px; color: #999;">
                                 Supported formats: JSON (export *.json) and GPX (*.gpx)
                             </p>
